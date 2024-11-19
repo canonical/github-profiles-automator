@@ -56,9 +56,6 @@ jobs:
     uses: canonical/charmed-kubeflow-workflows/.github/workflows/terraform-checks.yaml@main
     with:
       charm-path: .
-      # Don't run this workflow since the charm goes to `Error` state when deployed on its own
-      # See: https://github.com/canonical/resource-dispatcher/issues/66
-      apply: false
       
   integration:
     name: Integration Test (build and deploy)
@@ -84,19 +81,23 @@ jobs:
       run: kubectl get all -A
       if: failure()
 
+    - name: Describe deployments
+      run: kubectl describe deployments -A
+      if: failure()
+
+    - name: Describe replicasets
+      run: kubectl describe replicasets -A
+      if: failure()
+      
     - name: Get juju status
       run: juju status
       if: failure()
 
     - name: Get workload logs
-      run: kubectl logs --tail 100 -ntesting -lapp.kubernetes.io/name=resource-dispatcher
+      run: kubectl logs --tail 100 -n testing -lapp.kubernetes.io/name=github-profiles-automator
       if: failure()
 
     - name: Get operator logs
-      run: kubectl logs --tail 100 -ntesting -loperator.juju.is/name=resource-dispatcher
+      run: kubectl logs --tail 100 -n testing -loperator.juju.is/name=github-profiles-automator
       if: failure()
     
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
-      if: failure()
-      timeout-minutes: 40
