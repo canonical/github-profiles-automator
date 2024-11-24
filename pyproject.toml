@@ -37,4 +37,49 @@ max-complexity = 10
 skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
 
 [tool.pyright]
-include = ["src/**.py"]
+include = ["src"]
+
+[tool.poetry]
+name = "github-profiles-automator"
+version = "0.1.0"
+description = "A charm dedicated to updating Kubeflow Profiles based on a Profiles Management Representation file, that lives in a GitHub repo."
+authors = [
+  "Canonical Analytics Team"
+]
+license = "Apache License 2.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+[tool.poetry.group.unit]
+optional = true
+
+[tool.poetry.group.unit-library.dependencies]
+coverage = { extras = ["toml"], version = ">7.0" }
+pytest = "^8.3.3"
+pytest-operator = ">0.30"
+jsonschema = "^4.23.0"
+lightkube = "^0.15.5"
+
+[tool.poetry.group.unit.dependencies]
+coverage = { extras = ["toml"], version = ">7.0" }
+pytest = "^8.3.3"
+pytest-operator = ">0.30"
+jsonschema = "^4.23.0"
+lightkube = "^0.15.5"
+
+[tool.poetry.group.integration]
+optional = true
+
+[tool.poetry.group.integration.dependencies]
+tenacity = "^9.0.0"
+requests = "^2.32.3"
+pytest = "^8.3.3"
+pytest-operator = ">0.30"
+lightkube = "^0.15.5"
+jsonschema = "^4.23.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
