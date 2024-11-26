@@ -1,3 +1,21 @@
+# poetry
+[tool.poetry]
+name = "github-profiles-automator"
+version = "0.1.0"
+description = "A charm dedicated to updating Kubeflow Profiles based on a Profiles Management Representation file, that lives in a GitHub repo."
+authors = [
+  "Canonical Analytics Team"
+]
+license = "Apache License 2.0"
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+jsonschema = "^4.23.0"
+lightkube = "^0.15.5"
+ops = "^2.17.0"
+
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
@@ -26,7 +44,7 @@ lint.extend-ignore = [
     "D409",
     "D413",
 ]
-lint.ignore = ["E501", "D107"]
+lint.ignore = ["D107"]
 extend-exclude = ["__pycache__", "*.egg_info"]
 lint.per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104"]}
 
@@ -36,5 +54,69 @@ max-complexity = 10
 [tool.codespell]
 skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
 
+# LSPs and formatters
 [tool.pyright]
-include = ["src/**.py"]
+include = ["src"]
+
+[tool.black]
+line-length = 99
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+
+# format
+[tool.poetry.group.format]
+optional = true
+
+[tool.poetry.group.format.dependencies]
+ruff = "^0.8.0"
+black = "^24.10.0"
+
+# lint
+[tool.poetry.group.lint]
+optional = true
+
+[tool.poetry.group.lint.dependencies]
+ruff = "^0.8.0"
+codespell = "^2.3.0"
+
+# unit library tests
+[tool.poetry.group.unit-library]
+optional = true
+
+[tool.poetry.group.unit-library.dependencies]
+python = "^3.12"
+coverage = { extras = ["toml"], version = ">7.0" }
+pytest = "^8.3.3"
+pytest-operator = ">0.30"
+jsonschema = "^4.23.0"
+lightkube = "^0.15.5"
+
+# unit tests
+[tool.poetry.group.unit]
+optional = true
+
+[tool.poetry.group.unit.dependencies]
+coverage = { extras = ["toml"], version = ">7.0" }
+pytest = "^8.3.3"
+pytest-operator = ">0.30"
+jsonschema = "^4.23.0"
+lightkube = "^0.15.5"
+
+# integration tests
+ops = "^2.17.0"
+[tool.poetry.group.integration]
+optional = true
+
+[tool.poetry.group.integration.dependencies]
+tenacity = "^9.0.0"
+requests = "^2.32.3"
+pytest = "^8.3.3"
+pytest-operator = ">0.30"
+lightkube = "^0.15.5"
+jsonschema = "^4.23.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

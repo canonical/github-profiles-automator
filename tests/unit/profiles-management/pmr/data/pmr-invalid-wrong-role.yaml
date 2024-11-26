@@ -1,0 +1,9 @@
+profiles:
+- name: data-scientists
+  owner:
+    kind: User
+    name: admin@canonical.com
+  resources: {}
+  contributors:
+  - name: user@example.com
+    role: chef
