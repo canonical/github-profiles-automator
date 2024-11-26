@@ -15,6 +15,7 @@ https://juju.is/docs/sdk/create-a-minimal-kubernetes-charm
 import logging
 
 import ops
+from ops.charm import InstallEvent
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -27,6 +28,11 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
+
+        self.framework.observe(self.on.install, self._on_install)
+
+    def _on_install(self, _: InstallEvent):
+        self.unit.status = ops.ActiveStatus("hello friend")
 
 
 if __name__ == "__main__":  # pragma: nocover
