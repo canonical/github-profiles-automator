@@ -1,0 +1,16 @@
+profiles:
+- name: data-scientists
+  resources: {}
+  contributors:
+  - name: user@example.com
+    role: admin
+- name: pipeline-experts
+  owner:
+    kind: User
+    name: admin@canonical.com
+  resources: {}
+  contributors:
+  - name: user@example.com
+    role: admin
+  - name: kimonas.sotirchos@canonical.com
+    role: edit
