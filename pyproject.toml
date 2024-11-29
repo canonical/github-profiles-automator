@@ -1,13 +1,5 @@
 # poetry
 [tool.poetry]
-name = "github-profiles-automator"
-version = "0.1.0"
-description = "A charm dedicated to updating Kubeflow Profiles based on a Profiles Management Representation file, that lives in a GitHub repo."
-authors = [
-  "Canonical Analytics Team"
-]
-license = "Apache License 2.0"
-readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
@@ -62,14 +54,24 @@ include = ["src"]
 line-length = 99
 target-version = ["py312"]
 
+# Ensures that isort will format code that aligns with black. Used to configure
+# potential editors that will have isort installed, for automatically re-ordering
+# imports on save.
 [tool.isort]
 profile = "black"
 
-# format
-[tool.poetry.group.format]
+# update-requirements
+[tool.poetry.group.update-requirements]
 optional = true
 
-[tool.poetry.group.format.dependencies]
+[tool.poetry.group.update-requirements.dependencies]
+poetry-plugin-export = "^1.8.0"
+
+# format
+[tool.poetry.group.fmt]
+optional = true
+
+[tool.poetry.group.fmt.dependencies]
 ruff = "^0.8.0"
 black = "^24.10.0"
 
@@ -80,18 +82,17 @@ optional = true
 [tool.poetry.group.lint.dependencies]
 ruff = "^0.8.0"
 codespell = "^2.3.0"
+pyright = "^1.1.389"
+black = "^24.10.0"
 
 # unit library tests
 [tool.poetry.group.unit-library]
 optional = true
 
 [tool.poetry.group.unit-library.dependencies]
-python = "^3.12"
 coverage = { extras = ["toml"], version = ">7.0" }
 pytest = "^8.3.3"
 pytest-operator = ">0.30"
-jsonschema = "^4.23.0"
-lightkube = "^0.15.5"
 
 # unit tests
 [tool.poetry.group.unit]
@@ -101,21 +102,16 @@ optional = true
 coverage = { extras = ["toml"], version = ">7.0" }
 pytest = "^8.3.3"
 pytest-operator = ">0.30"
-jsonschema = "^4.23.0"
-lightkube = "^0.15.5"
 
 # integration tests
-ops = "^2.17.0"
 [tool.poetry.group.integration]
 optional = true
 
 [tool.poetry.group.integration.dependencies]
 tenacity = "^9.0.0"
-requests = "^2.32.3"
 pytest = "^8.3.3"
 pytest-operator = ">0.30"
-lightkube = "^0.15.5"
-jsonschema = "^4.23.0"
+
 
 [build-system]
 requires = ["poetry-core"]

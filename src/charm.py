@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
-# Copyright 2024 Kimonas Sotirchos
+# Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 #
-# Learn more at: https://juju.is/docs/sdk
+"""GitHub Profiles Automator charm.
 
-"""Charm the service.
-
-Refer to the following tutorial that will help you
-develop a new k8s charm using the Operator Framework:
-
-https://juju.is/docs/sdk/create-a-minimal-kubernetes-charm
+This charm is responsible for updating a Kubeflow cluster's Profiles and contributors to match
+a Profiles Representation (PMR) that is hosted as a file in a GitHub repo.
 """
 
 import logging

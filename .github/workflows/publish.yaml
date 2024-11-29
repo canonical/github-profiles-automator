@@ -28,11 +28,11 @@ on:
 jobs:
   get-charm-paths:
     name: Generate the Charm Matrix content
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       charm_paths: ${{ steps.get-charm-paths.outputs.charm-paths }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Get paths for all charms in this repo
