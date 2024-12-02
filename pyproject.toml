@@ -58,10 +58,10 @@ target-version = ["py312"]
 profile = "black"
 
 # format
-[tool.poetry.group.format]
+[tool.poetry.group.fmt]
 optional = true
 
-[tool.poetry.group.format.dependencies]
+[tool.poetry.group.fmt.dependencies]
 ruff = "^0.8.0"
 black = "^24.10.0"
 
@@ -73,6 +73,7 @@ optional = true
 ruff = "^0.8.0"
 codespell = "^2.3.0"
 pyright = "^1.1.389"
+black = "^24.10.0"
 
 # unit library tests
 [tool.poetry.group.unit-library]
