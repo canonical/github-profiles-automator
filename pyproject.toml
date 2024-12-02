@@ -1,13 +1,5 @@
 # poetry
 [tool.poetry]
-name = "github-profiles-automator"
-version = "0.1.0"
-description = "A charm dedicated to updating Kubeflow Profiles based on a Profiles Management Representation file, that lives in a GitHub repo."
-authors = [
-  "Canonical Analytics Team"
-]
-license = "Apache License 2.0"
-readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
