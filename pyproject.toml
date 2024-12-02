@@ -72,6 +72,7 @@ optional = true
 [tool.poetry.group.lint.dependencies]
 ruff = "^0.8.0"
 codespell = "^2.3.0"
+pyright = "^1.1.389"
 
 # unit library tests
 [tool.poetry.group.unit-library]
