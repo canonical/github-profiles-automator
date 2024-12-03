@@ -97,9 +97,9 @@ pytest = "^8.3.3"
 pytest-operator = ">0.30"
 jsonschema = "^4.23.0"
 lightkube = "^0.15.5"
+ops = "^2.17.0"
 
 # integration tests
-ops = "^2.17.0"
 [tool.poetry.group.integration]
 optional = true
 
