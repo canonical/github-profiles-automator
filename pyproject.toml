@@ -87,7 +87,6 @@ black = "^24.10.0"
 optional = true
 
 [tool.poetry.group.unit-library.dependencies]
-python = "^3.12"
 coverage = { extras = ["toml"], version = ">7.0" }
 pytest = "^8.3.3"
 pytest-operator = ">0.30"
