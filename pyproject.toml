@@ -57,6 +57,13 @@ target-version = ["py312"]
 [tool.isort]
 profile = "black"
 
+# update-requirements
+[tool.poetry.group.update-requirements]
+optional = true
+
+[tool.poetry.group.update-requirements.dependencies]
+poetry-plugin-export = "^1.8.0"
+
 # format
 [tool.poetry.group.fmt]
 optional = true
@@ -102,6 +109,7 @@ optional = true
 tenacity = "^9.0.0"
 pytest = "^8.3.3"
 pytest-operator = ">0.30"
+
 
 [build-system]
 requires = ["poetry-core"]
