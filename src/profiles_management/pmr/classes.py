@@ -13,139 +13,220 @@ with them.
 """
 
 import logging
-from enum import Enum
-from pathlib import Path
-from typing import List
+from enum import StrEnum
+from typing import Any, Dict, List, Optional
 
-import jsonschema
-import yaml
-
-from profiles_management.pmr.schema import PMR_SCHEMA
+from pydantic import BaseModel, TypeAdapter
 
 log = logging.getLogger(__name__)
 
 
-class UserKind(Enum):
-    """Class representing the kind of the user."""
+# Classes for ResourceQuotaSpec
+class Operator(StrEnum):
+    """Class for the Operator in MetchExpression of ResourceQuotaSpec."""
 
-    USER = 1
-    SERVICE_ACCOUNT = 2
+    In = "In"
+    NotIn = "NotIn"
+    Exists = "Exists"
+    DoesNotExist = "DoesNotExist"
 
 
-class ContributorRole(Enum):
-    """Class representing the role of the user."""
+class ScopedResourceSelectorRequirement(BaseModel, extra="forbid"):
+    """Class for objects of matchExpressions of ResourceQuotaSpec.
+
+    Args:
+        operator: Represents a scope's relationship to a set of values.
+        scope_name: The name of the scope that the selector applies to.
+        values: An array of string values. If the operator is In or NotIn, the values array must be
+                non-empty
+
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
+
+    operator: Operator
+    scope_name: str
+    values: Optional[List[str]] = None
+
+
+class ScopeSelector(BaseModel, extra="forbid"):
+    """Class for ScopeSelector of ResourceQuotaSpec.
+
+    Args:
+        match_expressions: A list of scope selector requirements by scope of the resources
+
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
+
+    match_expressions: List[ScopedResourceSelectorRequirement]
+
+
+class ResourceQuotaSpecModel(BaseModel, extra="forbid"):
+    """Class for K8s ResourceQuotaSpec.
+
+    Args:
+        hard: is the set of desired hard limits for each named resource.
+        scope_selector: collection of filters like scopes that must match each object tracked by a
+                        quota.
+        scopes: A collection of filters that must match each object tracked by a quota
+
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
+
+    hard: Optional[Dict[str, Any]] = None
+    scope_selector: Optional[ScopeSelector] = None
+    scopes: Optional[List[str]] = None
+
+
+# Classes for rest of the PMR
+class UserKind(StrEnum):
+    """Class representing the kind of the user as a Profile owner."""
+
+    USER = "user"
+    SERVICE_ACCOUNT = "service-account"
+
+
+class ContributorRole(StrEnum):
+    """Class representing the role of the user as a Contributor."""
 
     ADMIN = "admin"
     EDIT = "edit"
     VIEW = "view"
 
 
-class Contributor:
-    """Class representing which users should have access to a Profile."""
+class Contributor(BaseModel):
+    """Class representing what kind of access a user should have in a Profile.
+
+    Args:
+        name: The name of the Contributor. Will be used in RoleBinding and
+              AuthorizationPolicy created for the Contributor.
+        role: The Contributor's role. Matches what KFAM expects as annotations
+              in RoleBindings.
+
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
 
     name: str
     role: ContributorRole
 
-    def __init__(self, contributor: dict = {}):
-        self.name = contributor["name"]
 
-        role = contributor["role"]
-        if role == ContributorRole.ADMIN.value:
-            self.role = ContributorRole.ADMIN
-        elif role == ContributorRole.EDIT.value:
-            self.role = ContributorRole.EDIT
-        elif role == ContributorRole.VIEW.value:
-            self.role = ContributorRole.VIEW
+class Owner(BaseModel):
+    """Class representing the owner of a Profile.
 
+    Args:
+        name: The name of the owner. Will be used in RoleBinding and
+              AuthorizationPolicy created for the owner by the Profiles Controller.
+        kind: The kind of the owner, to distinguish between users and ServiceAccounts.
 
-class Owner:
-    """Class representing the owner field of a Profile."""
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
 
     name: str
     kind: UserKind
 
-    def __init__(self, owner: dict = {}):
-        self.name = owner["name"]
-        self.kind = owner["kind"]
 
+class Profile(BaseModel):
+    """Class representing a Profile and its Contributors.
 
-class Profile:
-    """Class representing a Profile and its Contributors."""
+    Args:
+        name: The name of the Profile, and namespace that will be created.
+        owner: The owner of the Profile.
+        resources: The ResourceQuotaSpec that should be applied in the Profile.
+        contributors: The Contributors that should have access in the Profile.
 
-    name = ""
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
+
+    name: str
     owner: Owner
-    resources = {}
-    contributors: List[Contributor] = []
-
-    def __init__(self, profile: dict = {}):
-        """Initialise a Profile based on a dict representation."""
-        self.name = profile["name"]
-        self.owner = Owner(profile["owner"])
-        self.resources = profile.get("resources", {})
-        self.contributors = [Contributor(c) for c in profile["contributors"]]
-
-    def has_contributor(self, name: str, role: ContributorRole) -> bool:
-        """Check if the Profile has a contributor with specific role."""
-        for contributor in self.contributors:
-            if contributor.name != name:
-                continue
-
-            if contributor.role != role:
-                continue
-
-            log.info("Profile %s has contributor (%s, %s)", self.name, name, role.value)
-            return True
-
-        log.info("Profile %s doesn't have contributor (%s, %s)", self.name, name, role.value)
-        return False
+    resources: Optional[ResourceQuotaSpecModel] = None
+    contributors: Optional[List[Contributor]] = []
 
 
 class ProfilesManagementRepresentation:
-    """A class representing the Profiles and Contributors."""
+    """A class representing the Profiles and Contributors.
 
-    profiles: dict[str, Profile] = {}
+    Args:
+        profiles_list: List of Profiles that should exist in the PMR.
 
-    def __init__(self, pmr: dict = {}, pmr_path=""):
-        """Initialise based on a PMR dict.
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
 
-        If a PMR file path is given, then the contents of that file
-        will be used to construct the PMR class instance.
+    def __init__(self, profiles_list: List[Profile] = []):
+        """Initialise based on a list of Profiles.
+
+        If a list of Profiles is given, then the internal dict will be initialised
+        based on this list.
+
+        Args:
+            profiles_list: List of Profiles to initialise PMR with.
+
+        Raises:
+            ValidationError: From pydantic if the validation failed.
         """
-        log.info("Creataing ProfilesManagementRepresentation object")
-        self.profiles = {}
+        TypeAdapter(List[Profile]).validate_python(profiles_list)
+        self._profiles = {}
+        self._profiles_list = profiles_list
 
-        # If a pth is given, then use this
-        if pmr_path:
-            log.info("Will try to load YAML contents from: %s", pmr_path)
-            pmr = yaml.safe_load(Path(pmr_path).read_text())
+    @property
+    def profiles(self) -> Dict[str, Profile]:
+        """Map of Profiles with the names as keys."""
+        profiles_dict = {}
 
-        if not pmr:
-            raise ValueError("No PMR dict or file path was given.")
+        if not self._profiles:
+            for profile in self._profiles_list or []:
+                profiles_dict[profile.name] = profile
 
-        # Ensure the PMR is valid before doing any parsing. Afterwards
-        # all functions should expect the PMR will have the required
-        # fields and with correct types.
-        self._validate_pmr(pmr)
+            self._profiles = profiles_dict
 
-        for profile in pmr["profiles"]:
-            self.profiles[profile["name"]] = Profile(profile)
+        return self._profiles
 
-    def _validate_pmr(self, pmr: dict):
-        """Validate if the PMR aligns with the schema."""
-        log.info("Validating if the PMR aligns with the schema")
-        jsonschema.validate(pmr, PMR_SCHEMA)
-        log.info("PMR dict is valid.")
+    def has_profile(self, name: str) -> bool:
+        """Check if given Profile name is part of the PMR.
 
-    def has_profile(self, name: str | None) -> bool:
-        """Check if given Profile name is part of the PMR."""
-        # naive iteration over all profiles
+        Args:
+            name: The name of the Profile to check if it exists in PMR.
+
+        Returns:
+            True / False depending if the Profile was found.
+        """
         return name in self.profiles
+
+    def add_profile(self, profile: Profile) -> None:
+        """Add a Profile to internal dict of Profiles.
+
+        Args:
+            profile: The PMR Profile to add to the PMR.
+        """
+        self.profiles[profile.name] = profile
+
+    def remove_profile(self, name: str):
+        """Remove Prorifle from PMR, if it exists.
+
+        Args:
+            name: The name of the Profile to remove from PMR.
+        """
+        if name not in self.profiles:
+            log.info("Profile %s not in PMR.", name)
+            return
+
+        del self.profiles[name]
 
     def __str__(self) -> str:
         """Print PMR in human friendly way."""
         repr = "Profiles:\n"
         for _, profile in self.profiles.items():
             repr += f"-  {profile.name}: "
+
+            if profile.contributors is None:
+                continue
+
             for c in profile.contributors:
                 repr += f"({c.name}, {c.role.value}) "
             repr += "\n"

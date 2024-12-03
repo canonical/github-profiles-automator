@@ -5,8 +5,8 @@ package-mode = false
 [tool.poetry.dependencies]
 python = "^3.12"
 jsonschema = "^4.23.0"
-lightkube = "^0.15.5"
 ops = "^2.17.0"
+pydantic = "^2.10.3"
 
 # Testing tools configuration
 [tool.coverage.run]
@@ -45,6 +45,7 @@ max-complexity = 10
 
 [tool.codespell]
 skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
+ignore-words-list = "NotIn"
 
 # LSPs and formatters
 [tool.pyright]
@@ -59,6 +60,7 @@ target-version = ["py312"]
 # imports on save.
 [tool.isort]
 profile = "black"
+line_length = 99
 
 # update-requirements
 [tool.poetry.group.update-requirements]
@@ -82,8 +84,10 @@ optional = true
 [tool.poetry.group.lint.dependencies]
 ruff = "^0.8.0"
 codespell = "^2.3.0"
-pyright = "^1.1.389"
+pyright = "1.1.386"
 black = "^24.10.0"
+pytest = "^8.3.3"
+pytest-operator = ">0.30"
 
 # unit library tests
 [tool.poetry.group.unit-library]
@@ -111,7 +115,6 @@ optional = true
 tenacity = "^9.0.0"
 pytest = "^8.3.3"
 pytest-operator = ">0.30"
-
 
 [build-system]
 requires = ["poetry-core"]

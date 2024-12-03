@@ -10,3 +10,8 @@ Github Profiles Automator charm is focused on updating Profiles and
 RoleBindings / AuthorizationPolicies for contributors in a Kubeflow
 cluster based on a central source of truth, a ProfileManagementRepresentation
 (PMR) defined in a file in a GitHub repo.
+
+## Profiles Management Representation
+
+This repository also contains the code for defining Profiles and Contributors in a source-agnostic
+way, please refer to the [README.md](src/profiles_management/README.md) for more information.

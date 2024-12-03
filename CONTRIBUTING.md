@@ -33,8 +33,8 @@ charmcraft pack
 
 ## Python versions
 
-The charm requires Python 3.12 to run/pack. If your system is using a different version of Python
-by default, you can do the following:
+Python 3.12 is required for locally running the unit tests and interact with the poetry groups.
+If your system is using a different version of Python by default, you can do the following:
 ```bash
 # install Python 3.12
 sudo add-apt-repository ppa:deadsnakes/ppa
@@ -53,10 +53,8 @@ pip install tox
 The charm also hosts the `profile_management` package which aims to be abstracted to its own PyPi module in the
 future. The code for this should be able to be tested (unit/integration) in separate from the rest of the charm.
 
-For this reason we have developed the following poetry and tox environments:
+For this reason we have developed dedicated poetry groups, and tox environments:
 ```bash
 # unit tests
-poetry install --with unit-library --no-root
 tox -e unit-library
 ```
-

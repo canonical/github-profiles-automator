@@ -20,6 +20,7 @@ resources:
 parts:
   charm:
     charm-python-packages: [setuptools]
+    # Until rustc 1.76 is available via apt we can remove the lines below
     # https://github.com/canonical/charmcraft/issues/1722
     build-snaps:
       - rustup

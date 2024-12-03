@@ -1,56 +1,93 @@
-import logging
+import pytest
+from pydantic import ValidationError
 
-from jsonschema.exceptions import ValidationError
-
-from profiles_management.pmr import classes
-
-log = logging.getLogger(__name__)
-
-UNIT_TESTS_DIR = "tests/unit/profiles-management/pmr/data"
-
-
-def test_valid_pmr():
-    pmr = classes.ProfilesManagementRepresentation(pmr_path=UNIT_TESTS_DIR + "/pmr-simple.yaml")
-
-    assert pmr is not None
+from profiles_management.pmr.classes import (
+    Owner,
+    Profile,
+    ProfilesManagementRepresentation,
+    ResourceQuotaSpecModel,
+    UserKind,
+)
 
 
-def test_prm_has_profiles():
-    pmr = classes.ProfilesManagementRepresentation(pmr_path=UNIT_TESTS_DIR + "/pmr-simple.yaml")
+@pytest.mark.parametrize(
+    "quota",
+    [
+        {"kimchi": 1},  # arbitrary fields
+        {"scopes": 1},  # incorrect type
+        {"hard": "1000"},  # incorrect type, no keys
+        {"kimchi": 1, "hard": {"cpu": "1000"}},  # arbitrary field plus correct field
+    ],
+)
+def test_invalid_resource_quota(quota):
+    with pytest.raises(ValidationError):
+        Profile(
+            name="test",
+            resources=ResourceQuotaSpecModel.model_validate(quota),
+            owner=Owner(name="kimchi", kind=UserKind.USER),
+        )
 
-    assert pmr.has_profile("data-scientists") is True
-    assert pmr.has_profile("pipeline-experts") is True
-    assert pmr.has_profile("katib-experts") is False
 
-
-def test_pmr_has_contributors():
-    pmr = classes.ProfilesManagementRepresentation(pmr_path=UNIT_TESTS_DIR + "/pmr-simple.yaml")
-
-    profile = pmr.profiles["data-scientists"]
-    assert profile.has_contributor("user@example.com", classes.ContributorRole.ADMIN) is True
-
-    assert profile.has_contributor("user@example.com", classes.ContributorRole.EDIT) is False
-    assert profile.has_contributor("kimonas@example.com", classes.ContributorRole.ADMIN) is False
-
-    profile = pmr.profiles["pipeline-experts"]
-    assert profile.has_contributor("user@example.com", classes.ContributorRole.ADMIN) is True
-    assert profile.has_contributor("user@example.com", classes.ContributorRole.EDIT) is False
-    assert (
-        profile.has_contributor("kimonas.sotirchos@canonical.com", classes.ContributorRole.EDIT)
-        is True
+def test_valid_resource_quota():
+    profile = Profile(
+        name="test",
+        contributors=[],
+        resources=ResourceQuotaSpecModel.model_validate(
+            {
+                "hard": {"cpu": "1000"},
+                "scopes": ["test"],
+            }
+        ),
+        owner=Owner(name="kimchi", kind=UserKind.USER),
     )
 
+    assert profile.resources is not None
+    assert profile.resources.hard is not None
+    assert profile.resources.hard["cpu"] == "1000"
 
-def test_invalid_pmrs():
-    files = [
-        "/pmr-invalid-no-owner.yaml",
-        "/pmr-invalid-no-contributors.yaml",
-        "/pmr-invalid-wrong-role.yaml",
-    ]
 
-    for file in files:
-        try:
-            classes.ProfilesManagementRepresentation(pmr_path=UNIT_TESTS_DIR + file)
-            assert False
-        except ValidationError:
-            assert True
+def test_profiles_in_pmr():
+    pmr = ProfilesManagementRepresentation()
+    pmr.add_profile(
+        Profile(
+            name="test-1",
+            owner=Owner(name="kimchi", kind=UserKind.USER),
+        )
+    )
+
+    pmr.add_profile(
+        Profile(
+            name="test-2",
+            owner=Owner(name="kimchi", kind=UserKind.USER),
+        )
+    )
+
+    assert pmr.has_profile("test-1")
+    assert pmr.has_profile("test-2")
+    assert pmr.has_profile("random") is False
+
+
+def test_remove_profiles_from_pmr():
+    pmr = ProfilesManagementRepresentation()
+    pmr.add_profile(
+        Profile(
+            name="test-1",
+            owner=Owner(name="kimchi", kind=UserKind.USER),
+        )
+    )
+
+    pmr.add_profile(
+        Profile(
+            name="test-2",
+            owner=Owner(name="kimchi", kind=UserKind.USER),
+        )
+    )
+
+    assert pmr.has_profile("test-1")
+    pmr.remove_profile("test-1")
+    assert pmr.has_profile("test-1") is False
+
+
+def test_invalid_pmr_input():
+    with pytest.raises(ValidationError):
+        ProfilesManagementRepresentation([1])  # type: ignore
