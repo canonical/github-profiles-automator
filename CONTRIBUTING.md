@@ -9,18 +9,6 @@ tox devenv -e integration
 source venv/bin/activate
 ```
 
-## Common Module
-
-The charm also hosts the `profile_management` package which aims to be abstracted to its own PyPi module in the
-future. The code for this should be able to be tested (unit/integration) in separate from the rest of the charm.
-
-For this reason we have developed the following poetry and tox environments:
-```bash
-# unit tests
-poetry install --with unit-library --no-root
-tox -e unit-library
-```
-
 ## Testing
 
 This project uses `tox` for managing test environments. There are some pre-configured environments
@@ -59,4 +47,16 @@ python3.12 -m venv venv
 source dev-venv/bin/activate
 pip install tox
 ```
-<!-- You may want to include any contribution/style guidelines in this document>
+
+## Common Module
+
+The charm also hosts the `profile_management` package which aims to be abstracted to its own PyPi module in the
+future. The code for this should be able to be tested (unit/integration) in separate from the rest of the charm.
+
+For this reason we have developed the following poetry and tox environments:
+```bash
+# unit tests
+poetry install --with unit-library --no-root
+tox -e unit-library
+```
+
