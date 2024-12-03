@@ -18,7 +18,7 @@ APP_NAME = METADATA["name"]
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
-    """Build the charm-under-test and deploy it together with related charms.
+    """Build the github-profiles-automator and deploy it.
 
     Assert on the unit status before any relations/configurations take place.
     """
@@ -30,9 +30,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
         assert False
 
     # Deploy the charm and wait for active/idle status
-    await asyncio.gather(
-        ops_test.model.deploy(charm, application_name=APP_NAME),
-        ops_test.model.wait_for_idle(
-            apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=1000
-        ),
+    await ops_test.model.deploy(charm, application_name=APP_NAME)
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=1000
     )
