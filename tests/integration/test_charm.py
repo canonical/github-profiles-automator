@@ -2,7 +2,6 @@
 # Copyright 2024 Kimonas Sotirchos
 # See LICENSE file for licensing details.
 
-import asyncio
 import logging
 from pathlib import Path
 
