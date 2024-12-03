@@ -134,7 +134,7 @@ class ProfilesManagementRepresentation:
         """Validate if the PMR aligns with the schema."""
         log.info("Validating if the PMR aligns with the schema")
         jsonschema.validate(pmr, PMR_SCHEMA)
-        log.info("PMR dict is valid.")
+        log.info("PMR dict passed jsonschema validation.")
 
     def has_profile(self, name: str | None) -> bool:
         """Check if given Profile name is part of the PMR."""

@@ -1,5 +1,6 @@
 import logging
 
+import pytest
 from jsonschema.exceptions import ValidationError
 
 from profiles_management.pmr import classes
@@ -39,6 +40,32 @@ def test_pmr_has_contributors():
         profile.has_contributor("kimonas.sotirchos@canonical.com", classes.ContributorRole.EDIT)
         is True
     )
+
+
+def test_resource_quota():
+    pmr = classes.ProfilesManagementRepresentation(
+        pmr_path=UNIT_TESTS_DIR + "/pmr-resourcequota.yaml"
+    )
+
+    profile = pmr.profiles["data-scientists"]
+    assert profile.resources is not None
+    assert profile.resources["hard"]["cpu"] == "1000"
+
+
+@pytest.mark.parametrize(
+    "pmr_path",
+    [
+        UNIT_TESTS_DIR + "/pmr-invalid-resourcequota-1.yaml",
+        UNIT_TESTS_DIR + "/pmr-invalid-resourcequota-2.yaml",
+        UNIT_TESTS_DIR + "/pmr-invalid-resourcequota-3.yaml",
+    ],
+)
+def test_invalid_resource_quotas(pmr_path):
+    try:
+        classes.ProfilesManagementRepresentation(pmr_path=pmr_path)
+        assert False
+    except ValidationError:
+        assert True
 
 
 def test_invalid_pmrs():

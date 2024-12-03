@@ -1,0 +1,10 @@
+profiles:
+- name: data-scientists
+  owner:
+    kind: User
+    name: admin@canonical.com
+  resources:
+    kimchi: 1
+  contributors:
+  - name: user@example.com
+    role: admin

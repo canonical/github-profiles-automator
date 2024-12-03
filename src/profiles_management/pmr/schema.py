@@ -11,6 +11,7 @@ PMR_SCHEMA = {
                     "name": {"type": "string"},
                     "owner": {
                         "type": "object",
+                        "additionalProperties": False,
                         "properties": {
                             "kind": {
                                 "type": "string",
@@ -20,15 +21,66 @@ PMR_SCHEMA = {
                         },
                         "required": ["kind", "name"],
                     },
+                    # https://kubernetes.io/docs/reference/kubernetes-api/policy-resources/resource-quota-v1/#ResourceQuotaSpec
                     "resources": {
                         "type": "object",
-                        # allow arbitrary fields
-                        "additionalProperties": True,
+                        "additionalProperties": False,
+                        "anyOf": [
+                            # Either hard is required, or no keys at all
+                            {"required": ["hard"]},
+                            {"maxProperties": 0},
+                        ],
+                        "properties": {
+                            "hard": {
+                                "type": "object",
+                                # allow arbitrary fields
+                                "additionalProperties": True,
+                            },
+                            "scopeSelector": {
+                                "type": "object",
+                                "properties": {
+                                    "matchExpressions": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "required": ["operator", "scopeName"],
+                                            "properties": {
+                                                "operator": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "In",
+                                                        "NotIn",
+                                                        "Exists",
+                                                        "DoesNotExist",
+                                                    ],
+                                                },
+                                                "scopeName": {
+                                                    "type": "string",
+                                                },
+                                                "values": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            "scopes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                },
+                            },
+                        },
                     },
                     "contributors": {
                         "type": "array",
                         "items": {
                             "type": "object",
+                            "additionalProperties": False,
                             "properties": {
                                 "name": {"type": "string"},
                                 "role": {
