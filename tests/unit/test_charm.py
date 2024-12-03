@@ -1,8 +1,3 @@
-# Copyright 2024 Kimonas Sotirchos
-# See LICENSE file for licensing details.
-#
-# Learn more about testing at: https://juju.is/docs/sdk/testing
-
 import ops
 import ops.testing
 import pytest
