@@ -32,6 +32,10 @@ def load_profiles_from_file(file_path: str, context: dict = {}) -> List[codecs.A
     return profiles
 
 
+def get_profile(name: str, client: Client) -> GenericGlobalResource:
+    return client.get(Profile, name=name)
+
+
 def apply_profile(
     profile: codecs.AnyResource, client: Client, wait_namespace=False
 ) -> GenericGlobalResource:

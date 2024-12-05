@@ -1,7 +1,7 @@
 import logging
 
 import pytest
-from lightkube import Client
+from lightkube import ApiError, Client
 
 from profiles_management.create import create_or_update_profiles
 from profiles_management.pmr import classes
@@ -16,7 +16,7 @@ TESTS_YAMLS_PATH = "tests/integration/profiles_management/yamls"
 async def test_remove_access_in_stale_profiles(
     deploy_profiles_controller, lightkube_client: Client
 ):
-    await deploy_profiles_controller
+    # await deploy_profiles_controller
 
     yamls_path = TESTS_YAMLS_PATH + "/profile.yaml"
     log.info("Loading test yamls from: %s" % yamls_path)
@@ -47,3 +47,29 @@ async def test_remove_access_in_stale_profiles(
 
     log.info("Removing test Profile and resources in it")
     profiles.remove_profile(profile, lightkube_client, wait_namespace=True)
+
+
+@pytest.mark.asyncio
+async def test_new_profiles_created(deploy_profiles_controller, lightkube_client: Client):
+    pmr = classes.ProfilesManagementRepresentation()
+
+    users = ["kimonas", "noha", "orfeas"]
+    expected_quota = classes.ResourceQuotaSpecModel.model_validate({"hard": {"cpu": "1"}})
+    for user in users:
+        pmr.add_profile(
+            classes.Profile(
+                name=user,
+                owner=classes.Owner(name=user, kind=classes.UserKind.USER),
+                resources=expected_quota,
+            )
+        )
+
+    create_or_update_profiles(pmr)
+
+    log.info("Will check if Profiles were created as expected")
+    for user in users:
+        created_profile = profiles.get_profile(user, lightkube_client)
+        created_profile_quota = classes.ResourceQuotaSpecModel.model_validate(
+            created_profile["spec"]["resourceQuotaSpec"]
+        )
+        assert created_profile_quota == expected_quota

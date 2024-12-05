@@ -6,6 +6,9 @@ from lightkube import Client
 from profiles_management.create import remove_access_in_stale_profile
 from tests.integration.profiles_management.helpers import k8s, kfam, profiles
 
+# silence default INFO logs of httpx, to avoid seeing
+# a log line for every request that happens with that module
+logging.getLogger("httpx").setLevel(logging.WARNING)
 log = logging.getLogger(__name__)
 
 TESTS_YAMLS_PATH = "tests/integration/profiles_management/yamls"
@@ -15,7 +18,7 @@ TESTS_YAMLS_PATH = "tests/integration/profiles_management/yamls"
 async def test_remove_access_from_stale_profile(
     deploy_profiles_controller, lightkube_client: Client
 ):
-    await deploy_profiles_controller
+    # await deploy_profiles_controller
 
     yamls_path = TESTS_YAMLS_PATH + "/profile.yaml"
     log.info("Loading test yamls from: %s" % yamls_path)
