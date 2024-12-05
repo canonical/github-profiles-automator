@@ -14,6 +14,7 @@ from typing import Dict
 
 from lightkube.generic_resource import GenericGlobalResource
 
+from profiles_management.helpers import profiles
 from profiles_management.helpers.k8s import get_name
 from profiles_management.helpers.kfam import (
     delete_contributor_authorization_policy,
@@ -21,7 +22,6 @@ from profiles_management.helpers.kfam import (
     list_contributor_authorization_policies,
     list_contributor_rolebindings,
 )
-from profiles_management.helpers.profiles import list_profiles
 from profiles_management.pmr.classes import ProfilesManagementRepresentation
 
 log = logging.getLogger(__name__)
@@ -77,8 +77,10 @@ def create_or_update_profiles(pmr: ProfilesManagementRepresentation):
     """
     log.info("Fetching all Profiles in the cluster")
 
+    # Will need to efficiently parse existing Profile names in the follow
+    # up code
     existing_profiles: Dict[str, GenericGlobalResource] = {}
-    for profile in list_profiles():
+    for profile in profiles.list_profiles():
         existing_profiles[get_name(profile)] = profile
 
     log.info("Removing access to all stale Profiles")
@@ -88,3 +90,16 @@ def create_or_update_profiles(pmr: ProfilesManagementRepresentation):
 
         logging.info("Profile %s not in PMR . Will remove access.", profile_name)
         remove_access_in_stale_profile(existing_profile)
+
+    # Create or update Profile CRs
+    log.info("Creating or updating Profile CRs based on PMR.")
+    for profile_name, profile in pmr.profiles.items():
+        log.info("Parsing Profile %s from PMR")
+
+        existing_profile = existing_profiles.get(profile_name, None)
+        if existing_profile is None:
+            log.info("No Profile CR exists for Profile %s, creating it.", profile_name)
+            existing_profile = profiles.apply_pmr_profile(profile, wait_namespace=True)
+
+        log.info("Creating or updating the ResourceQuota for the Profile.")
+        profiles.update_resource_quota(existing_profile, profile)
