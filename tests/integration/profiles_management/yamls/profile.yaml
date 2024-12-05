@@ -1,0 +1,47 @@
+apiVersion: kubeflow.org/v1
+kind: Profile
+metadata:
+  name: {{namespace}}
+  labels:
+    purpose: testing
+spec:
+  owner:
+    kind: User
+    name: user@example.com
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  annotations:
+    role: edit
+    user: kimonas@canonical.com
+  name: user-kimonas-canonical-com-clusterrole-edit
+  namespace: {{namespace}}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubeflow-edit
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: kimonas@canonical.com
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  annotations:
+    role: edit
+    user: kimonas@canonical.com
+  name: user-kimonas-canonical-com-clusterrole-edit
+  namespace: {{namespace}}
+spec:
+  rules:
+  - from:
+    - source:
+        principals:
+        - cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account
+        - cluster.local/ns/kubeflow/sa/ml-pipeline-ui
+    when:
+    - key: request.headers[kubeflow-userid]
+      values:
+      - kimonas@canonical.com
