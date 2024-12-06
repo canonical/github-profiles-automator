@@ -13,14 +13,13 @@ with them.
 """
 
 import logging
+from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
-from typing import List
+from typing import Any, Dict, List
 
 import jsonschema
-import yaml
 
-from profiles_management.pmr.schema import PMR_SCHEMA
+from profiles_management.pmr.schema import RESOURCE_QUOTA_SCHEMA
 
 log = logging.getLogger(__name__)
 
@@ -28,8 +27,8 @@ log = logging.getLogger(__name__)
 class UserKind(Enum):
     """Class representing the kind of the user."""
 
-    USER = 1
-    SERVICE_ACCOUNT = 2
+    USER = "user"
+    SERVICE_ACCOUNT = "service-account"
 
 
 class ContributorRole(Enum):
@@ -40,49 +39,37 @@ class ContributorRole(Enum):
     VIEW = "view"
 
 
+@dataclass
 class Contributor:
     """Class representing which users should have access to a Profile."""
 
     name: str
     role: ContributorRole
 
-    def __init__(self, contributor: dict = {}):
-        self.name = contributor["name"]
 
-        role = contributor["role"]
-        if role == ContributorRole.ADMIN.value:
-            self.role = ContributorRole.ADMIN
-        elif role == ContributorRole.EDIT.value:
-            self.role = ContributorRole.EDIT
-        elif role == ContributorRole.VIEW.value:
-            self.role = ContributorRole.VIEW
-
-
+@dataclass
 class Owner:
     """Class representing the owner field of a Profile."""
 
     name: str
     kind: UserKind
 
-    def __init__(self, owner: dict = {}):
-        self.name = owner["name"]
-        self.kind = owner["kind"]
 
-
+@dataclass
 class Profile:
     """Class representing a Profile and its Contributors."""
 
-    name = ""
+    name: str
     owner: Owner
-    resources = {}
-    contributors: List[Contributor] = []
+    resources: Dict[str, Any]
+    contributors: List[Contributor]
 
-    def __init__(self, profile: dict = {}):
-        """Initialise a Profile based on a dict representation."""
-        self.name = profile["name"]
-        self.owner = Owner(profile["owner"])
-        self.resources = profile.get("resources", {})
-        self.contributors = [Contributor(c) for c in profile["contributors"]]
+    # https://docs.python.org/3/library/dataclasses.html#post-init-processing
+    def __post_init__(self):
+        """Validate resourceQuota after values have been initialised."""
+        log.info("Validating ResourceQuota for Profile: %s", self.name)
+        jsonschema.validate(self.resources, RESOURCE_QUOTA_SCHEMA)
+        log.info("ResourceQuota is valid.")
 
     def has_contributor(self, name: str, role: ContributorRole) -> bool:
         """Check if the Profile has a contributor with specific role."""
@@ -105,41 +92,30 @@ class ProfilesManagementRepresentation:
 
     profiles: dict[str, Profile] = {}
 
-    def __init__(self, pmr: dict = {}, pmr_path=""):
-        """Initialise based on a PMR dict.
+    def __init__(self, profiles: List[Profile] = []):
+        """Initialise based on a list of Profiles.
 
-        If a PMR file path is given, then the contents of that file
-        will be used to construct the PMR class instance.
+        If a list of Profiles is given, then the internal dict will be initialised
+        based on this list.
         """
-        log.info("Creataing ProfilesManagementRepresentation object")
-        self.profiles = {}
-
-        # If a pth is given, then use this
-        if pmr_path:
-            log.info("Will try to load YAML contents from: %s", pmr_path)
-            pmr = yaml.safe_load(Path(pmr_path).read_text())
-
-        if not pmr:
-            raise ValueError("No PMR dict or file path was given.")
-
-        # Ensure the PMR is valid before doing any parsing. Afterwards
-        # all functions should expect the PMR will have the required
-        # fields and with correct types.
-        self._validate_pmr(pmr)
-
-        for profile in pmr["profiles"]:
-            self.profiles[profile["name"]] = Profile(profile)
-
-    def _validate_pmr(self, pmr: dict):
-        """Validate if the PMR aligns with the schema."""
-        log.info("Validating if the PMR aligns with the schema")
-        jsonschema.validate(pmr, PMR_SCHEMA)
-        log.info("PMR dict passed jsonschema validation.")
+        for profile in profiles:
+            self.add_profile(profile)
 
     def has_profile(self, name: str | None) -> bool:
         """Check if given Profile name is part of the PMR."""
-        # naive iteration over all profiles
         return name in self.profiles
+
+    def add_profile(self, profile: Profile):
+        """Add a Profile to internal dict of Profiles."""
+        self.profiles[profile.name] = profile
+
+    def remove_profile(self, name: str | None):
+        """Remove Prorifle from PMR, if it exists."""
+        if name not in self.profiles:
+            log.info("Profile %s not in PMR.", name)
+            return
+
+        del self.profiles[name]
 
     def __str__(self) -> str:
         """Print PMR in human friendly way."""

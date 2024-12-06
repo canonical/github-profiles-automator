@@ -1,83 +1,111 @@
-import logging
-
 import pytest
 from jsonschema.exceptions import ValidationError
 
-from profiles_management.pmr import classes
-
-log = logging.getLogger(__name__)
-
-UNIT_TESTS_DIR = "tests/unit/profiles-management/pmr/data"
-
-
-def test_valid_pmr():
-    pmr = classes.ProfilesManagementRepresentation(pmr_path=UNIT_TESTS_DIR + "/pmr-simple.yaml")
-
-    assert pmr is not None
-
-
-def test_prm_has_profiles():
-    pmr = classes.ProfilesManagementRepresentation(pmr_path=UNIT_TESTS_DIR + "/pmr-simple.yaml")
-
-    assert pmr.has_profile("data-scientists") is True
-    assert pmr.has_profile("pipeline-experts") is True
-    assert pmr.has_profile("katib-experts") is False
-
-
-def test_pmr_has_contributors():
-    pmr = classes.ProfilesManagementRepresentation(pmr_path=UNIT_TESTS_DIR + "/pmr-simple.yaml")
-
-    profile = pmr.profiles["data-scientists"]
-    assert profile.has_contributor("user@example.com", classes.ContributorRole.ADMIN) is True
-
-    assert profile.has_contributor("user@example.com", classes.ContributorRole.EDIT) is False
-    assert profile.has_contributor("kimonas@example.com", classes.ContributorRole.ADMIN) is False
-
-    profile = pmr.profiles["pipeline-experts"]
-    assert profile.has_contributor("user@example.com", classes.ContributorRole.ADMIN) is True
-    assert profile.has_contributor("user@example.com", classes.ContributorRole.EDIT) is False
-    assert (
-        profile.has_contributor("kimonas.sotirchos@canonical.com", classes.ContributorRole.EDIT)
-        is True
-    )
-
-
-def test_resource_quota():
-    pmr = classes.ProfilesManagementRepresentation(
-        pmr_path=UNIT_TESTS_DIR + "/pmr-resourcequota.yaml"
-    )
-
-    profile = pmr.profiles["data-scientists"]
-    assert profile.resources is not None
-    assert profile.resources["hard"]["cpu"] == "1000"
+from profiles_management.pmr.classes import (
+    Contributor,
+    ContributorRole,
+    Owner,
+    Profile,
+    ProfilesManagementRepresentation,
+    UserKind,
+)
 
 
 @pytest.mark.parametrize(
-    "pmr_path",
+    "quota",
     [
-        UNIT_TESTS_DIR + "/pmr-invalid-resourcequota-1.yaml",
-        UNIT_TESTS_DIR + "/pmr-invalid-resourcequota-2.yaml",
-        UNIT_TESTS_DIR + "/pmr-invalid-resourcequota-3.yaml",
+        {"kimchi": 1},  # arbitrary fields
+        {"hard": "1000"},  # doesn't have cpu
+        {"kimchi": 1, "hard": {"cpu": "1000"}},  # arbitrary field plus correct field
     ],
 )
-def test_invalid_resource_quotas(pmr_path):
+def test_invalid_resource_quota(quota):
     try:
-        classes.ProfilesManagementRepresentation(pmr_path=pmr_path)
+        Profile(
+            name="test",
+            contributors=[],
+            resources=quota,
+            owner=Owner(name="kimchi", kind=UserKind.USER),
+        )
         assert False
     except ValidationError:
         assert True
 
 
-def test_invalid_pmrs():
-    files = [
-        "/pmr-invalid-no-owner.yaml",
-        "/pmr-invalid-no-contributors.yaml",
-        "/pmr-invalid-wrong-role.yaml",
-    ]
+def test_valid_resource_quota():
+    profile = Profile(
+        name="test",
+        contributors=[],
+        resources={
+            "hard": {"cpu": "1000"},
+            "scopes": ["test"],
+        },
+        owner=Owner(name="kimchi", kind=UserKind.USER),
+    )
+    assert profile.resources["hard"]["cpu"] == "1000"
 
-    for file in files:
-        try:
-            classes.ProfilesManagementRepresentation(pmr_path=UNIT_TESTS_DIR + file)
-            assert False
-        except ValidationError:
-            assert True
+
+def test_profile_has_contributor():
+    profile = Profile(
+        name="test",
+        contributors=[
+            Contributor(name="user-a", role=ContributorRole.EDIT),
+            Contributor(name="user-b", role=ContributorRole.VIEW),
+        ],
+        resources={},
+        owner=Owner(name="user-admin", kind=UserKind.USER),
+    )
+
+    assert profile.has_contributor("user-a", ContributorRole.EDIT)
+    assert profile.has_contributor("user-a", ContributorRole.VIEW) is False
+    assert profile.has_contributor("user-b", ContributorRole.VIEW)
+
+
+def test_profiles_in_pmr():
+    pmr = ProfilesManagementRepresentation()
+    pmr.add_profile(
+        Profile(
+            name="test-1",
+            contributors=[],
+            resources={},
+            owner=Owner(name="kimchi", kind=UserKind.USER),
+        )
+    )
+
+    pmr.add_profile(
+        Profile(
+            name="test-2",
+            contributors=[],
+            resources={},
+            owner=Owner(name="kimchi", kind=UserKind.USER),
+        )
+    )
+
+    assert pmr.has_profile("test-1")
+    assert pmr.has_profile("test-2")
+    assert pmr.has_profile("random") is False
+
+
+def test_remove_profiles_from_pmr():
+    pmr = ProfilesManagementRepresentation()
+    pmr.add_profile(
+        Profile(
+            name="test-1",
+            contributors=[],
+            resources={},
+            owner=Owner(name="kimchi", kind=UserKind.USER),
+        )
+    )
+
+    pmr.add_profile(
+        Profile(
+            name="test-2",
+            contributors=[],
+            resources={},
+            owner=Owner(name="kimchi", kind=UserKind.USER),
+        )
+    )
+
+    assert pmr.has_profile("test-1")
+    pmr.remove_profile("test-1")
+    assert pmr.has_profile("test-1") is False
