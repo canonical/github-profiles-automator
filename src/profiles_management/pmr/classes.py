@@ -14,7 +14,7 @@ with them.
 
 import logging
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Dict, List
 
 import jsonschema
@@ -24,14 +24,14 @@ from profiles_management.pmr.schema import RESOURCE_QUOTA_SCHEMA
 log = logging.getLogger(__name__)
 
 
-class UserKind(Enum):
+class UserKind(StrEnum):
     """Class representing the kind of the user."""
 
     USER = "user"
     SERVICE_ACCOUNT = "service-account"
 
 
-class ContributorRole(Enum):
+class ContributorRole(StrEnum):
     """Class representing the role of the user."""
 
     ADMIN = "admin"
