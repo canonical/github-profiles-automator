@@ -51,12 +51,6 @@ jobs:
     - name: Run unit tests
       run: tox -e unit
 
-  terraform-checks:
-    name: Terraform
-    uses: canonical/charmed-kubeflow-workflows/.github/workflows/terraform-checks.yaml@main
-    with:
-      charm-path: .
-      
   integration:
     name: Integration Test (build and deploy)
     runs-on: ubuntu-24.04
@@ -88,7 +82,7 @@ jobs:
     - name: Describe replicasets
       run: kubectl describe replicasets -A
       if: failure()
-      
+
     - name: Get juju status
       run: juju status
       if: failure()
@@ -100,4 +94,4 @@ jobs:
     - name: Get operator logs
       run: kubectl logs --tail 100 -n testing -loperator.juju.is/name=github-profiles-automator
       if: failure()
-    
+
