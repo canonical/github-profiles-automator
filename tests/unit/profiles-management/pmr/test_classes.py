@@ -45,22 +45,6 @@ def test_valid_resource_quota():
     assert profile.resources["hard"]["cpu"] == "1000"
 
 
-def test_profile_has_contributor():
-    profile = Profile(
-        name="test",
-        contributors=[
-            Contributor(name="user-a", role=ContributorRole.EDIT),
-            Contributor(name="user-b", role=ContributorRole.VIEW),
-        ],
-        resources={},
-        owner=Owner(name="user-admin", kind=UserKind.USER),
-    )
-
-    assert profile.has_contributor("user-a", ContributorRole.EDIT)
-    assert profile.has_contributor("user-a", ContributorRole.VIEW) is False
-    assert profile.has_contributor("user-b", ContributorRole.VIEW)
-
-
 def test_profiles_in_pmr():
     pmr = ProfilesManagementRepresentation()
     pmr.add_profile(

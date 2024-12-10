@@ -71,21 +71,6 @@ class Profile:
         jsonschema.validate(self.resources, RESOURCE_QUOTA_SCHEMA)
         log.info("ResourceQuota is valid.")
 
-    def has_contributor(self, name: str, role: ContributorRole) -> bool:
-        """Check if the Profile has a contributor with specific role."""
-        for contributor in self.contributors:
-            if contributor.name != name:
-                continue
-
-            if contributor.role != role:
-                continue
-
-            log.info("Profile %s has contributor (%s, %s)", self.name, name, role.value)
-            return True
-
-        log.info("Profile %s doesn't have contributor (%s, %s)", self.name, name, role.value)
-        return False
-
 
 class ProfilesManagementRepresentation:
     """A class representing the Profiles and Contributors."""
