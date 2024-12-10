@@ -86,20 +86,35 @@ class ProfilesManagementRepresentation:
 
         If a list of Profiles is given, then the internal dict will be initialised
         based on this list.
+
+        Args:
+          profiles_list: List of Profiles to initialise PMR with
         """
         for profile in profiles_list:
             self.add_profile(profile)
 
     def has_profile(self, name: str) -> bool:
-        """Check if given Profile name is part of the PMR."""
+        """Check if given Profile name is part of the PMR.
+
+        Args:
+          name: The name of the Profile to check if it exists in PMR
+        """
         return name in self.profiles
 
     def add_profile(self, profile: Profile) -> None:
-        """Add a Profile to internal dict of Profiles."""
+        """Add a Profile to internal dict of Profiles.
+
+        Args:
+          profile: The PMR Profile to add to the PMR
+        """
         self.profiles[profile.name] = profile
 
     def remove_profile(self, name: str):
-        """Remove Prorifle from PMR, if it exists."""
+        """Remove Prorifle from PMR, if it exists.
+
+        Args:
+          name: The name of the Profile to remove from PMR
+        """
         if name not in self.profiles:
             log.info("Profile %s not in PMR.", name)
             return
