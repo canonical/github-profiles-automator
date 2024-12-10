@@ -56,7 +56,7 @@ class ConsumerCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
 
-        self.framework.observe(self.on.install, self.reconcile)
+        self.framework.observe(self.on.update_status, self.reconcile)
 
     def reconcile():
         # create a PMR and call the library's functions
