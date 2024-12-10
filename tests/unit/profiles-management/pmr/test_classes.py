@@ -1,12 +1,11 @@
 import pytest
-from jsonschema.exceptions import ValidationError
+from pydantic import ValidationError
 
 from profiles_management.pmr.classes import (
-    Contributor,
-    ContributorRole,
     Owner,
     Profile,
     ProfilesManagementRepresentation,
+    ResourceQuotaSpecModel,
     UserKind,
 )
 
@@ -15,7 +14,8 @@ from profiles_management.pmr.classes import (
     "quota",
     [
         {"kimchi": 1},  # arbitrary fields
-        {"hard": "1000"},  # doesn't have cpu
+        {"scopes": 1},  # incorrect type
+        {"hard": "1000"},  # incorrect type, no keys
         {"kimchi": 1, "hard": {"cpu": "1000"}},  # arbitrary field plus correct field
     ],
 )
@@ -24,7 +24,7 @@ def test_invalid_resource_quota(quota):
         Profile(
             name="test",
             contributors=[],
-            resources=quota,
+            resources=ResourceQuotaSpecModel.model_validate(quota),
             owner=Owner(name="kimchi", kind=UserKind.USER),
         )
         assert False
@@ -36,13 +36,15 @@ def test_valid_resource_quota():
     profile = Profile(
         name="test",
         contributors=[],
-        resources={
+        resources=ResourceQuotaSpecModel.model_validate({
             "hard": {"cpu": "1000"},
             "scopes": ["test"],
-        },
+        }),
         owner=Owner(name="kimchi", kind=UserKind.USER),
     )
-    assert profile.resources["hard"]["cpu"] == "1000"
+
+    assert profile.resources.hard is not None
+    assert profile.resources.hard["cpu"] == "1000"
 
 
 def test_profiles_in_pmr():
@@ -51,7 +53,7 @@ def test_profiles_in_pmr():
         Profile(
             name="test-1",
             contributors=[],
-            resources={},
+            resources=ResourceQuotaSpecModel(),
             owner=Owner(name="kimchi", kind=UserKind.USER),
         )
     )
@@ -60,7 +62,7 @@ def test_profiles_in_pmr():
         Profile(
             name="test-2",
             contributors=[],
-            resources={},
+            resources=ResourceQuotaSpecModel(),
             owner=Owner(name="kimchi", kind=UserKind.USER),
         )
     )
@@ -76,7 +78,7 @@ def test_remove_profiles_from_pmr():
         Profile(
             name="test-1",
             contributors=[],
-            resources={},
+            resources=ResourceQuotaSpecModel(),
             owner=Owner(name="kimchi", kind=UserKind.USER),
         )
     )
@@ -85,7 +87,7 @@ def test_remove_profiles_from_pmr():
         Profile(
             name="test-2",
             contributors=[],
-            resources={},
+            resources=ResourceQuotaSpecModel(),
             owner=Owner(name="kimchi", kind=UserKind.USER),
         )
     )

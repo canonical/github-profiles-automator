@@ -72,7 +72,7 @@ class ConsumerCharm(ops.CharmBase):
                 ))
 
             # resource quota
-            quota = {"hard": {"limits.cpu": "1"}}
+            quota = classes.ResourceQuotaSpecModel.model_validate({"hard": {"limits.cpu": "1"}})
 
             # owner
             owner = classes.Owner(name="admin@canonical.com"
