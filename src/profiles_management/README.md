@@ -51,7 +51,7 @@ from profiles_management.pmr import classes
 from profiles_management import create_or_update_profiles
 
 
-class TestCharm(ops.CharmBase):
+class ConsumerCharm(ops.CharmBase):
 
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
@@ -62,20 +62,20 @@ class TestCharm(ops.CharmBase):
         # create a PMR and call the library's functions
         pmr = classes.ProfilesManagementRepresentation()
 
-        for group_name in self.read_groups_identity_provider():
+        for profile_name in ["ml-engineers"]:
             # create the contributors of the Profile
             contributors = []
-            for user, role in self.read_users_from_group(group_name):
+            for user, role in [("kimonas@canonical.com", classes.ContributorRole.EDIT)]:
                 contributors.append(classes.Contributor(
                     name=user,
                     role=self.pmr_role_from_oidc_role(role)
                 ))
 
             # resource quota
-            quota = self.read_resource_quota_from_group_metadata(group_name)
+            quota = {"hard": {"limits.cpu": "1"}}
 
             # owner
-            owner = classes.Owner(name="admin@example.com"
+            owner = classes.Owner(name="admin@canonical.com"
                                   kind=classes.UserKind.USER)
             # create the Profile
             profile = classes.Profile(
