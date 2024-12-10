@@ -90,7 +90,7 @@ class ProfilesManagementRepresentation:
         """Check if given Profile name is part of the PMR."""
         return name in self.profiles
 
-    def add_profile(self, profile: Profile):
+    def add_profile(self, profile: Profile) -> None:
         """Add a Profile to internal dict of Profiles."""
         self.profiles[profile.name] = profile
 
