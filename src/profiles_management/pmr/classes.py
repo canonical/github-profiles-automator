@@ -77,13 +77,13 @@ class ProfilesManagementRepresentation:
 
     profiles: dict[str, Profile] = {}
 
-    def __init__(self, profiles: List[Profile] = []):
+    def __init__(self, profiles_list: List[Profile] = []):
         """Initialise based on a list of Profiles.
 
         If a list of Profiles is given, then the internal dict will be initialised
         based on this list.
         """
-        for profile in profiles:
+        for profile in profiles_list:
             self.add_profile(profile)
 
     def has_profile(self, name: str | None) -> bool:
