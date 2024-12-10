@@ -86,7 +86,7 @@ class ProfilesManagementRepresentation:
         for profile in profiles_list:
             self.add_profile(profile)
 
-    def has_profile(self, name: str | None) -> bool:
+    def has_profile(self, name: str) -> bool:
         """Check if given Profile name is part of the PMR."""
         return name in self.profiles
 
@@ -94,7 +94,7 @@ class ProfilesManagementRepresentation:
         """Add a Profile to internal dict of Profiles."""
         self.profiles[profile.name] = profile
 
-    def remove_profile(self, name: str | None):
+    def remove_profile(self, name: str):
         """Remove Prorifle from PMR, if it exists."""
         if name not in self.profiles:
             log.info("Profile %s not in PMR.", name)
