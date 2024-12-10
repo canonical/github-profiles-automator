@@ -66,7 +66,11 @@ class Profile:
 
     # https://docs.python.org/3/library/dataclasses.html#post-init-processing
     def __post_init__(self):
-        """Validate resourceQuota after values have been initialised."""
+        """Validate resourceQuota after values have been initialised.
+
+        If the resources are not a valid ResourceQuotaSpec then a
+        jsonschema.exceptions.ValidationError will be raised.
+        """
         log.info("Validating ResourceQuota for Profile: %s", self.name)
         jsonschema.validate(self.resources, RESOURCE_QUOTA_SCHEMA)
         log.info("ResourceQuota is valid.")
