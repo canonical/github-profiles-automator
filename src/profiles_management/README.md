@@ -4,6 +4,41 @@ This module aims to be a standalone python module focused around:
 1. Exposing the ProfileManagementRepresentation (PMR) classes
 2. Functions that manipulate the cluster, based on a PMR
 
+## Overview
+
+The PMR consists of a list of classes for defining the Profiles and their
+Contributors in an agnostic way. With this representation it's then possible
+to write functions that manipulate a Kubeflow cluster based on a PMR.
+
+The structure of the PMR, in YAML can be seen in the following section:
+```yaml
+profiles:
+- name: ml-engineers
+  owner:
+    kind: User
+    name: admin@canonical.com
+  resources:
+    hard:
+      limits.cpu = "1"
+  contributors:
+  - name: kimonas@canonical.com
+    role: admin
+  - name: michal@canonical.com
+    role: edit
+  - name: andreea@canonical.com
+    role: view
+- name: data-engineers
+  owner:
+    kind: User
+    name: admin@canonical.com
+  contributors:
+  - name: daniela@canonical.com
+    role: edit
+  - name: bart@canonical.com
+    role: edit
+  resources: {}
+```
+
 ## Consume from Charms
 
 This library is meant to be used by other Charms that will construct
