@@ -33,8 +33,8 @@ charmcraft pack
 
 ## Python versions
 
-The charm requires Python 3.12 to run/pack. If your system is using a different version of Python
-by default, you can do the following:
+The charm requires Python 3.12 to locally run the unit tests and interact with the poetry groups.
+If your system is using a different version of Python by default, you can do the following:
 ```bash
 # install Python 3.12
 sudo add-apt-repository ppa:deadsnakes/ppa
