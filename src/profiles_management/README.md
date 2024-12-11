@@ -81,7 +81,7 @@ class ConsumerCharm(ops.CharmBase):
             profile = classes.Profile(
                 name=group_name,
                 resources=quota,
-                contributors=ontributors,
+                contributors=contributors,
                 owner=owner
             )
 
