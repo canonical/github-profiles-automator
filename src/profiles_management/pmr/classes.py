@@ -13,71 +13,115 @@ with them.
 """
 
 import logging
-from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Dict, List
+from typing import Annotated, Any, Dict, List, Optional
 
-import jsonschema
-
-from profiles_management.pmr.schema import RESOURCE_QUOTA_SCHEMA
+from pydantic import BaseModel, TypeAdapter
 
 log = logging.getLogger(__name__)
 
 
+# Classes for ResourceQuotaSpec
+class Operator(StrEnum):
+    """Pydantic class for the Operator in MetchExpression of ResourceQuotaSpec."""
+
+    In = "In"
+    NotIn = "NotIn"
+    Exists = "Exists"
+    DoesNotExist = "DoesNotExist"
+
+
+class ScopedResourceSelectorRequirement(BaseModel, extra="forbid"):
+    """Pydantic class for objects of matchExpressions of ResourceQuotaSpec.
+
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
+
+    operator: Operator
+    scope_name: str
+    values: Optional[List[str]] = None
+
+
+class ScopeSelector(BaseModel, extra="forbid"):
+    """Pydantic class for ScopeSelector of ResourceQuotaSpec.
+
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
+
+    match_expressions: List[ScopedResourceSelectorRequirement]
+
+
+class ResourceQuotaSpecModel(BaseModel, extra="forbid"):
+    """Pydantic class for ResourceQuotaSpec.
+
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
+
+    hard: Optional[Dict[str, Any]] = None
+    scope_selector: Optional[ScopeSelector] = None
+    scopes: Optional[List[str]] = None
+
+
+# Classes for rest of the PMR
 class UserKind(StrEnum):
-    """Class representing the kind of the user."""
+    """Class representing the kind of the user as a Profile owner."""
 
     USER = "user"
     SERVICE_ACCOUNT = "service-account"
 
 
 class ContributorRole(StrEnum):
-    """Class representing the role of the user."""
+    """Class representing the role of the user as a contributor."""
 
     ADMIN = "admin"
     EDIT = "edit"
     VIEW = "view"
 
 
-@dataclass
-class Contributor:
-    """Class representing which users should have access to a Profile."""
+class Contributor(BaseModel):
+    """Class representing what kind of access a user should have in a Profile.
+
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
 
     name: str
     role: ContributorRole
 
 
-@dataclass
-class Owner:
-    """Class representing the owner field of a Profile."""
+class Owner(BaseModel):
+    """Class representing the owner of a Profile.
+
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
 
     name: str
     kind: UserKind
 
 
-@dataclass
-class Profile:
-    """Class representing a Profile and its Contributors."""
+class Profile(BaseModel):
+    """Class representing a Profile and its Contributors.
+
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
 
     name: str
     owner: Owner
-    resources: Dict[str, Any]
-    contributors: List[Contributor]
-
-    # https://docs.python.org/3/library/dataclasses.html#post-init-processing
-    def __post_init__(self):
-        """Validate resourceQuota after values have been initialised.
-
-        If the resources are not a valid ResourceQuotaSpec then a
-        jsonschema.exceptions.ValidationError will be raised.
-        """
-        log.info("Validating ResourceQuota for Profile: %s", self.name)
-        jsonschema.validate(self.resources, RESOURCE_QUOTA_SCHEMA)
-        log.info("ResourceQuota is valid.")
+    resources: ResourceQuotaSpecModel
+    contributors: List[Contributor] = []
 
 
 class ProfilesManagementRepresentation:
-    """A class representing the Profiles and Contributors."""
+    """A class representing the Profiles and Contributors.
+
+    Raises:
+        ValidationError: From pydantic if the validation failed.
+    """
 
     profiles: dict[str, Profile] = {}
 
@@ -88,8 +132,14 @@ class ProfilesManagementRepresentation:
         based on this list.
 
         Args:
-          profiles_list: List of Profiles to initialise PMR with
+            profiles_list: List of Profiles to initialise PMR with.
+
+        Raises:
+            ValidationError: From pydantic if the validation failed.
         """
+        # validate the input type
+        TypeAdapter(List[Profile]).validate_python(profiles_list)
+
         for profile in profiles_list:
             self.add_profile(profile)
 
@@ -97,7 +147,10 @@ class ProfilesManagementRepresentation:
         """Check if given Profile name is part of the PMR.
 
         Args:
-          name: The name of the Profile to check if it exists in PMR
+            name: The name of the Profile to check if it exists in PMR.
+
+        Returns:
+            True / False depending if the Profile was found.
         """
         return name in self.profiles
 
@@ -105,7 +158,7 @@ class ProfilesManagementRepresentation:
         """Add a Profile to internal dict of Profiles.
 
         Args:
-          profile: The PMR Profile to add to the PMR
+            profile: The PMR Profile to add to the PMR.
         """
         self.profiles[profile.name] = profile
 
@@ -113,7 +166,7 @@ class ProfilesManagementRepresentation:
         """Remove Prorifle from PMR, if it exists.
 
         Args:
-          name: The name of the Profile to remove from PMR
+            name: The name of the Profile to remove from PMR.
         """
         if name not in self.profiles:
             log.info("Profile %s not in PMR.", name)
