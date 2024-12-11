@@ -46,6 +46,7 @@ max-complexity = 10
 
 [tool.codespell]
 skip = "build,lib,venv,icon.svg,.tox,.git,.mypy_cache,.ruff_cache,.coverage"
+ignore-words-list = "NotIn"
 
 # LSPs and formatters
 [tool.pyright]
@@ -83,8 +84,10 @@ optional = true
 [tool.poetry.group.lint.dependencies]
 ruff = "^0.8.0"
 codespell = "^2.3.0"
-pyright = "^1.1.389"
+pyright = "1.1.386"
 black = "^24.10.0"
+pytest = "^8.3.3"
+pytest-operator = ">0.30"
 
 # unit library tests
 [tool.poetry.group.unit-library]
@@ -112,7 +115,6 @@ optional = true
 tenacity = "^9.0.0"
 pytest = "^8.3.3"
 pytest-operator = ">0.30"
-
 
 [build-system]
 requires = ["poetry-core"]
