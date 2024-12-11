@@ -140,6 +140,7 @@ class ProfilesManagementRepresentation:
         # validate the input type
         TypeAdapter(List[Profile]).validate_python(profiles_list)
 
+        self.profiles = {}
         for profile in profiles_list:
             self.add_profile(profile)
 
