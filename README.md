@@ -13,5 +13,5 @@ cluster based on a central source of truth, a ProfileManagementRepresentation
 
 ## Profiles Management Representation
 
-This repo also contains the code for defining Profiles and Contributors in a source-agnostic
-way. You can find more about this in the [README.md](src/profiles_management/README.md)
+This repository also contains the code for defining Profiles and Contributors in a source-agnostic
+way, please refer to the [README.md](src/profiles_management/README.md) for more information.
