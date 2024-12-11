@@ -33,7 +33,7 @@ charmcraft pack
 
 ## Python versions
 
-The charm requires Python 3.12 to locally run the unit tests and interact with the poetry groups.
+Python 3.12 is required for locally running the unit tests and interact with the poetry groups.
 If your system is using a different version of Python by default, you can do the following:
 ```bash
 # install Python 3.12
