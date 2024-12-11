@@ -56,9 +56,9 @@ class ConsumerCharm(ops.CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
 
-        self.framework.observe(self.on.update_status, self.reconcile)
+        self.framework.observe(self.on["container"].pebble_custom_notice, self.reconcile)
 
-    def reconcile():
+    def reconcile(self, _: ops.PebbleNoticeEvent):
         # create a PMR and call the library's functions
         pmr = classes.ProfilesManagementRepresentation()
 
