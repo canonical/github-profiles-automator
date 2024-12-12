@@ -112,8 +112,8 @@ class Profile(BaseModel):
 
     name: str
     owner: Owner
-    resources: ResourceQuotaSpecModel
-    contributors: List[Contributor] = []
+    resources: Optional[ResourceQuotaSpecModel] = None
+    contributors: Optional[List[Contributor]] = []
 
 
 class ProfilesManagementRepresentation:
