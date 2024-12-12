@@ -66,6 +66,7 @@ class ConsumerCharm(ops.CharmBase):
         for profile_name in ["ml-engineers"]:
             # create the contributors of the Profile
             contributors = []
+            # Iterate over a list of users
             for user, role in [("kimonas@canonical.com", classes.ContributorRole.EDIT)]:
                 contributors.append(classes.Contributor(
                     name=user,
