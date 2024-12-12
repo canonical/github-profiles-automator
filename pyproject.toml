@@ -60,6 +60,7 @@ target-version = ["py312"]
 # imports on save.
 [tool.isort]
 profile = "black"
+line_length = 99
 
 # update-requirements
 [tool.poetry.group.update-requirements]
