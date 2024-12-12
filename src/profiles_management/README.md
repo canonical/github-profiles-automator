@@ -62,6 +62,7 @@ class ConsumerCharm(ops.CharmBase):
         # create a PMR and call the library's functions
         pmr = classes.ProfilesManagementRepresentation()
 
+       # Iterate over a list of groups
         for profile_name in ["ml-engineers"]:
             # create the contributors of the Profile
             contributors = []
