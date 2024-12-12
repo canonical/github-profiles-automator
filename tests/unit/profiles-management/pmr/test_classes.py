@@ -32,10 +32,12 @@ def test_valid_resource_quota():
     profile = Profile(
         name="test",
         contributors=[],
-        resources=ResourceQuotaSpecModel.model_validate({
-            "hard": {"cpu": "1000"},
-            "scopes": ["test"],
-        }),
+        resources=ResourceQuotaSpecModel.model_validate(
+            {
+                "hard": {"cpu": "1000"},
+                "scopes": ["test"],
+            }
+        ),
         owner=Owner(name="kimchi", kind=UserKind.USER),
     )
 
