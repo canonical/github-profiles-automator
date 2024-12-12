@@ -20,15 +20,12 @@ from profiles_management.pmr.classes import (
     ],
 )
 def test_invalid_resource_quota(quota):
-    try:
+    with pytest.raises(ValidationError):
         Profile(
             name="test",
             resources=ResourceQuotaSpecModel.model_validate(quota),
             owner=Owner(name="kimchi", kind=UserKind.USER),
         )
-        assert False
-    except ValidationError:
-        assert True
 
 
 def test_valid_resource_quota():
@@ -90,8 +87,5 @@ def test_remove_profiles_from_pmr():
 
 
 def test_invalid_pmr_input():
-    try:
+    with pytest.raises(ValidationError):
         ProfilesManagementRepresentation([1])  # type: ignore
-        assert False
-    except ValidationError:
-        assert True
