@@ -180,6 +180,10 @@ class ProfilesManagementRepresentation:
         repr = "Profiles:\n"
         for _, profile in self.profiles.items():
             repr += f"-  {profile.name}: "
+
+            if profile.contributors is None:
+                continue
+
             for c in profile.contributors:
                 repr += f"({c.name}, {c.role.value}) "
             repr += "\n"

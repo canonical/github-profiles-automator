@@ -23,7 +23,6 @@ def test_invalid_resource_quota(quota):
     try:
         Profile(
             name="test",
-            contributors=[],
             resources=ResourceQuotaSpecModel.model_validate(quota),
             owner=Owner(name="kimchi", kind=UserKind.USER),
         )
@@ -36,15 +35,14 @@ def test_valid_resource_quota():
     profile = Profile(
         name="test",
         contributors=[],
-        resources=ResourceQuotaSpecModel.model_validate(
-            {
-                "hard": {"cpu": "1000"},
-                "scopes": ["test"],
-            }
-        ),
+        resources=ResourceQuotaSpecModel.model_validate({
+            "hard": {"cpu": "1000"},
+            "scopes": ["test"],
+        }),
         owner=Owner(name="kimchi", kind=UserKind.USER),
     )
 
+    assert profile.resources is not None
     assert profile.resources.hard is not None
     assert profile.resources.hard["cpu"] == "1000"
 
@@ -54,8 +52,6 @@ def test_profiles_in_pmr():
     pmr.add_profile(
         Profile(
             name="test-1",
-            contributors=[],
-            resources=ResourceQuotaSpecModel(),
             owner=Owner(name="kimchi", kind=UserKind.USER),
         )
     )
@@ -63,8 +59,6 @@ def test_profiles_in_pmr():
     pmr.add_profile(
         Profile(
             name="test-2",
-            contributors=[],
-            resources=ResourceQuotaSpecModel(),
             owner=Owner(name="kimchi", kind=UserKind.USER),
         )
     )
@@ -79,8 +73,6 @@ def test_remove_profiles_from_pmr():
     pmr.add_profile(
         Profile(
             name="test-1",
-            contributors=[],
-            resources=ResourceQuotaSpecModel(),
             owner=Owner(name="kimchi", kind=UserKind.USER),
         )
     )
@@ -88,8 +80,6 @@ def test_remove_profiles_from_pmr():
     pmr.add_profile(
         Profile(
             name="test-2",
-            contributors=[],
-            resources=ResourceQuotaSpecModel(),
             owner=Owner(name="kimchi", kind=UserKind.USER),
         )
     )
