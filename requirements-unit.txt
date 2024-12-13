@@ -1,0 +1,4 @@
+coverage
+pytest
+ops ~= 2.8
+charmed_kubeflow_chisme == 0.2.0

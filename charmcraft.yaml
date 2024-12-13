@@ -1,0 +1,62 @@
+name: github-profiles-automator
+type: charm
+title: Github Profiles Automator charm
+summary: A charm to automatically sync Kubeflow Profiles based on a Github repository
+description: |
+  A charm to automatically sync Kubeflow Profiles based on a Github repository.
+
+  This charm uses git-sync as a workload container to connect and continuously
+  sync with a Github repository, and uses profile information to update the
+  current Kubeflow deployment.
+
+  It is useful for cluster administrators who want to automatically update
+  the profiles on the cluster, based on a single source of truth.
+bases:
+  - build-on:
+    - name: "ubuntu"
+      channel: "22.04"
+    run-on:
+    - name: "ubuntu"
+      channel: "22.04"
+
+config:
+  options:
+    repository:
+      default: "git@github.com:mvlassis/super-public-repo.git"
+      description: |
+        The URL of the repository to fetch. Must be configured for the charm to
+        operate.
+      type: string
+    sync-period:
+      default: 10
+      description: |
+        How long to wait between sync attempts. 
+      type: int
+    pmr-yaml-path:
+      default: "pmr.yaml"
+      description: |
+        The relative path to the .yaml file inside the Github repository that
+        contains the PMR information
+      type: string
+    ssh-key-secret-id:
+      type: secret
+      description: |
+        A configuration option to store the secret ID needed to access the SSH key for the Github
+        repository
+
+containers:
+  git-sync:
+    resource: git-sync-image
+    mounts:
+      - storage: content-from-git
+        location: /git
+
+resources:
+  git-sync-image:
+    type: oci-image
+    description: OCI image for the 'some-container' container
+    upstream-source: registry.k8s.io/git-sync/git-sync:v4.3.0
+    
+storage:
+  content-from-git:
+    type: filesystem
