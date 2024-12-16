@@ -2,7 +2,7 @@ name: github-profiles-automator
 type: charm
 title: GitHub Profiles Automator
 
-summary: A charm for automating the management of Kubeflow Profiles from a GitHub repo
+summary: A charm for automating the management of Kubeflow Profiles from a GitHub repository
 
 description: |
   This charm is responsible for monitoring a file from a GitHub repo that represents
@@ -15,8 +15,44 @@ base: ubuntu@24.04
 platforms:
   amd64:
 
+config:
+  options:
+    repository:
+      default: "git@github.com:mvlassis/super-public-repo.git"
+      description: |
+        The URL of the repository to fetch. Must be configured for the charm to
+        operate.
+      type: string
+    sync-period:
+      default: 10
+      description: |
+        How long to wait between sync attempts. 
+      type: int
+    pmr-yaml-path:
+      default: "pmr.yaml"
+      description: |
+        The relative path to the .yaml file inside the Github repository that
+        contains the PMR information
+      type: string
+    ssh-key-secret-id:
+      type: secret
+      description: |
+        A configuration option to store the secret ID needed to access the SSH key for the Github
+        repository    
+    
 resources:
+  git-sync-image:
+    type: oci-image
+    description: OCI image for the 'git-sync' container
+    upstream-source: registry.k8s.io/git-sync/git-sync:v4.3.0
 
+containers:
+  git-sync:
+    resource: git-sync-image
+    mounts:
+      - storage: content-from-git
+        location: /git    
+    
 parts:
   charm:
     charm-python-packages: [setuptools]
@@ -24,6 +60,14 @@ parts:
     # https://github.com/canonical/charmcraft/issues/1722
     build-snaps:
       - rustup
+    build-packages:
+      - pkg-config
+      - libffi-dev
+      - libssl-dev
     override-build: |
       rustup default stable
       craftctl default
+
+storage:
+  content-from-git:
+    type: filesystem      

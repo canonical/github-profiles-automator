@@ -3,6 +3,7 @@
 package-mode = false
 
 [tool.poetry.dependencies]
+charmed_kubeflow_chisme = "^0.4.4"
 python = "^3.12"
 jsonschema = "^4.23.0"
 ops = "^2.17.0"
