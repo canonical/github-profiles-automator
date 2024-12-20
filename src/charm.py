@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # Copyright 2024 Canonical Ltd.
 
-"""Charm for the Github Profiles Automation"""
+"""Charm for the Github Profiles Automation."""
 
 import logging
+import re
 
 import ops
 from charmed_kubeflow_chisme.components import ContainerFileTemplate
 from charmed_kubeflow_chisme.components.charm_reconciler import CharmReconciler
 from charmed_kubeflow_chisme.components.leadership_gate_component import LeadershipGateComponent
+from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 
 from components.pebble_component import (
     GitSyncInputs,
@@ -31,6 +33,14 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         self.pebble_service_name = "git-sync"
         self.container = self.unit.get_container("git-sync")
 
+        self.files_to_push = []
+
+        try:
+            self._parse_repository_config()
+        except ErrorWithStatus as e:
+            self.unit.status = e.status
+            return
+
         self.charm_reconciler = CharmReconciler(self)
 
         self.leadership_gate = self.charm_reconciler.add(
@@ -50,21 +60,21 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         ]
 
         # Save SSH key as a file to use FileContainers
-        ssh_key_secret_id = self.config.get("ssh-key-secret-id")
-        if ssh_key_secret_id:
-            ssh_key_secret = self.model.get_secret(id=ssh_key_secret_id)
-            ssh_key = ssh_key_secret.get_content(refresh=True)["ssh-key"]
+        try:
+            ssh_key = self._get_ssh_key()
             if ssh_key:
                 with open("ssh-key", "w") as file:
                     file.write(ssh_key)
-                    file.write("\n\n")
-                files_to_push.append(
-                    ContainerFileTemplate(
-                        source_template_path="ssh-key",
-                        destination_path=SSH_KEY_DESTINATION_PATH,
-                        permissions=SSH_KEY_PERMISSIONS,
+                    file.write("\n\n")  # SSH keys need empty lines in their tail
+                    files_to_push.append(
+                        ContainerFileTemplate(
+                            source_template_path="ssh-key",
+                            destination_path=SSH_KEY_DESTINATION_PATH,
+                            permissions=SSH_KEY_PERMISSIONS,
+                        )
                     )
-                )
+        except ErrorWithStatus:
+            pass
 
         self.pebble_service_container = self.charm_reconciler.add(
             component=GitSyncPebbleService(
@@ -74,8 +84,8 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 service_name=self.pebble_service_name,
                 files_to_push=files_to_push,
                 inputs_getter=lambda: GitSyncInputs(
-                    REPOSITORY=self.config["repository"],
-                    SYNC_PERIOD=self.config["sync-period"],
+                    REPOSITORY=str(self.config["repository"]),
+                    SYNC_PERIOD=int(self.config["sync-period"]),
                 ),
             ),
             depends_on=[self.leadership_gate],
@@ -83,31 +93,44 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
 
         self.charm_reconciler.install_default_event_handlers()
 
-    # framework.observe(self.on["git_sync"].pebble_ready, self._on_pebble_ready)
-    # framework.observe(self.on["git_sync"].pebble_custom_notice, self._on_pebble_custom_notice)
-    # framework.observe(self.on.config_changed, self._on_config_changed)
-
-    # def _on_config_changed(self, event: ops.ConfigChangedEvent):
-    #     """Handle config changed event."""
-    #     self.unit.status = ops.ActiveStatus("Config Changed")
+    # def ssh_key(self) -> str:
+    #     ssh_key_secret_id = str(self.config.get("ssh-key-secret-id"))
     #     try:
-    #         services = self.container.get_plan()
-    #         logger.warning(str(services))
-    #     except ops.pebble.APIError:
-    #         self.unit.status = ops.MaintenanceStatus('Waiting for Pebble in workload container')
+    #         ssh_key_secret = self.model.get_secret(id=ssh_key_secret_id)
+    #         ssh_key = ssh_key_secret.get_content(refresh=True)["ssh-key"]
+    #         return ssh_key
+    #     except ops.SecretNotFoundError:
+    #         return ""
 
-    # def _on_pebble_ready(self, event: ops.PebbleReadyEvent):
-    #     """Handle pebble-ready event."""
-    #     container = event.workload
+    def _get_ssh_key(self) -> str | None:
+        """Try to get the SSH key value from the Juju secrets, using the ssh-key-secret-id config.
 
-    #     container.add_layer("git_sync_layer", self._pebble_layer, combine=True)
-    #     container.replan()
-    #     self.unit.status = ops.ActiveStatus("Layer added")
+        Returns:
+            str: The SSH key as a string, or None if the Juju secret doesn't exist, or the config
+            hasn't been set.
+        """
+        ssh_key_secret_id = str(self.config.get("ssh-key-secret-id"))
+        try:
+            ssh_key_secret = self.model.get_secret(id=ssh_key_secret_id)
+            ssh_key = ssh_key_secret.get_content(refresh=True)["ssh-key"]
+            return str(ssh_key)
+        except (ops.SecretNotFoundError, ops.model.ModelError):
+            raise ErrorWithStatus(
+                "Error: To connect via an SSH URL you need to provide an SSH key",
+                ops.BlockedStatus,
+            )
 
-    # def _on_pebble_custom_notice(self, event: ops.PebbleNoticeEvent):
-    #     """Handle Pebble Notice event."""
-    #     container = event.workload
-    #     self.unit.status = ops.ActiveStatus("Received notice event")
+    def _parse_repository_config(self):
+        """Parse a repository string and raise appropriate errors."""
+        if self.config["repository"] == "":
+            raise ErrorWithStatus("Error: config `repository` cannot be empty", ops.BlockedStatus)
+        # Check if the repository is an SSH URL
+        ssh_url_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+:[\w./~-]+$"
+        if re.match(ssh_url_pattern, str(self.config["repository"])):
+            self._get_ssh_key()
+        https_url_pattern = r"^https?://[a-zA-Z0-9.-]+/[\w.-]+/[\w.-]+(\.git)?$"
+        if not re.match(https_url_pattern, str(self.config["repository"])):
+            raise ErrorWithStatus("Error: Repository isn't a valid Github URL", ops.BlockedStatus)
 
 
 if __name__ == "__main__":
