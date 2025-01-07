@@ -51,7 +51,7 @@ def apply_profile(
     Args:
         profile: The Profile ligthkube resource to apply to the cluster.
         client: The lightkube client to use for talking to K8s.
-        wait_namespace: If the code should wait, with a timeout, for namespace
+        wait_namespace: If the code should for the namespace
                         to be created before returning.
 
     Returns:

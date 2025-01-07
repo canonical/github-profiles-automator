@@ -13,7 +13,7 @@ TESTS_YAMLS_PATH = "tests/integration/profiles_management/yamls"
 
 
 @pytest.mark.asyncio
-async def test_remove_access_in_stale_profiles(
+async def test_remove_access_to_stale_profiles(
     deploy_profiles_controller, lightkube_client: Client
 ):
     await deploy_profiles_controller
@@ -24,7 +24,7 @@ async def test_remove_access_in_stale_profiles(
     profile_path = TESTS_YAMLS_PATH + "/profile.yaml"
     contributor_path = TESTS_YAMLS_PATH + "/contributor.yaml"
 
-    # load and apply all objects from files
+    # Load and apply all objects from files
     profile_contents = profiles.load_profile_from_file(profile_path, context)
     resources = k8s.load_namespaced_objects_from_file(contributor_path, context)
 

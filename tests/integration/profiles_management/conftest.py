@@ -1,3 +1,5 @@
+"""Fixtures for all integration tests."""
+
 import logging
 
 import lightkube
@@ -14,7 +16,7 @@ log = logging.getLogger(__name__)
 @pytest.fixture(scope="session")
 def lightkube_client():
     """Fixture to create a Lightkube client."""
-    log.info("Initializing lightkube client")
+    log.info("Initializing lightkube client.")
     return lightkube.Client(field_manager="profile-automator-tests")
 
 

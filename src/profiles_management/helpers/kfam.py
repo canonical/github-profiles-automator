@@ -28,7 +28,7 @@ def list_contributor_rolebindings(namespace="") -> List[RoleBinding]:
 
     Args:
         namespace: The namespace to list contributors from. For all namespaces
-                   you can use "" value.
+                   you can pass an empty string "".
 
     Returns:
         A list of RoleBindings that are used from KFAM for contributors.

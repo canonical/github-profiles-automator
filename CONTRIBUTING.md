@@ -25,9 +25,9 @@ tox                  # runs 'fmt', 'lint', 'static', and 'unit' environments
 
 ## Integration Tests
 
-When running/developing integration tests there will be times that the tests will fail. During teardown
+When running/developing integration tests there will be times when the tests fail. During teardown
 of the integration tests the following things happen:
-1. The juju model that the Profiles Controller charm was deployed gets deleted
+1. The Juju model that the Profiles Controller charm was deployed gets deleted
 2. The Profile CRs created during tests will still be there
 
 Deleting then a Profile will result in the Profile to never be deleted. This is because:
@@ -35,7 +35,7 @@ Deleting then a Profile will result in the Profile to never be deleted. This is 
 2. The Profile Controller that should be responsible for removing the finaliser is not deployed
 3. K8s waits indefinitely until the finaliser is removed, to remove the Profile object
 
-While developing tests locally there are two approaches to go about this
+While developing tests locally there are two approaches to go about this:
 
 #### Have Profiles Controller always deployed
 

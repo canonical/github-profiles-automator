@@ -23,10 +23,10 @@ class ObjectStillExistsError(Exception):
 
 
 def get_name(res: GenericNamespacedResource | GenericGlobalResource) -> str:
-    """Return the name from generic lightkube resource.
+    """Return the name from a generic lightkube resource.
 
     Args:
-        res: The resource to get it's name from metadata.name
+        res: The resource to get its name from metadata.name
 
     Raises:
         ValueError: if the object doesn't have metadata or metadata.name
@@ -35,7 +35,7 @@ def get_name(res: GenericNamespacedResource | GenericGlobalResource) -> str:
         The name of the object from its metadata.
     """
     if not res.metadata:
-        pytest.xfail("Coldn't detect name, object has no metadata: %s" % res)
+        pytest.xfail("Couldn't detect name, object has no metadata: %s" % res)
 
     if not res.metadata.name:
         pytest.xfail("Couldn't detect name, object has no name field: %s" % res)
@@ -44,7 +44,7 @@ def get_name(res: GenericNamespacedResource | GenericGlobalResource) -> str:
 
 
 def get_namespace(res: GenericNamespacedResource) -> str:
-    """Return the name from generic lightkube resource.
+    """Return the name from a generic lightkube resource.
 
     Args:
         res: The namespaced resource to get the namespace of

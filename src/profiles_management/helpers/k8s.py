@@ -19,7 +19,7 @@ def get_name(res: GenericNamespacedResource | GenericGlobalResource) -> str:
         The name of the object from its metadata.
     """
     if not res.metadata:
-        raise ValueError("Coldn't detect name, object has no metadata: %s" % res)
+        raise ValueError("Couldn't detect name, object has no metadata: %s" % res)
 
     if not res.metadata.name:
         raise ValueError("Couldn't detect name, object has no name field: %s" % res)

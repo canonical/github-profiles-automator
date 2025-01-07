@@ -2,7 +2,7 @@
 
 This module includes both
 1. the high level functions for updating/creating Profiles based on a PM
-2. helpers to that will handle the different phases of the above logic
+2. helpers that will handle the different phases of the above logic
 
 The main function exposed is the create_or_update_profile(pmr), which
 will run an update on the whole cluster's Profiles anad Contributors
@@ -27,7 +27,7 @@ from profiles_management.pmr.classes import ProfilesManagementRepresentation
 log = logging.getLogger(__name__)
 
 
-def remove_access_in_stale_profile(profile: GenericGlobalResource):
+def remove_access_to_stale_profile(profile: GenericGlobalResource):
     """Remove access to all users from a Profile.
 
     This is achieved by removing all KFAM RoleBindings and
@@ -85,5 +85,5 @@ def create_or_update_profiles(pmr: ProfilesManagementRepresentation):
         if pmr.has_profile(profile_name):
             continue
 
-        logging.info("Profile %s not in PMR . Will remove access.", profile_name)
-        remove_access_in_stale_profile(existing_profile)
+        logging.info("Profile %s not in PMR. Will remove access.", profile_name)
+        remove_access_to_stale_profile(existing_profile)
