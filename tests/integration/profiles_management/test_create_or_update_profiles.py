@@ -3,7 +3,7 @@ import logging
 import pytest
 from lightkube import Client
 
-from profiles_management.create import create_or_update_profiles
+from profiles_management.create_or_update import create_or_update_profiles
 from profiles_management.pmr import classes
 from tests.integration.profiles_management.helpers import k8s, kfam, profiles
 

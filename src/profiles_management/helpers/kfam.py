@@ -3,11 +3,9 @@
 import logging
 from typing import List
 
-from lightkube.core.exceptions import ApiError
+from lightkube import Client
 from lightkube.generic_resource import GenericNamespacedResource, create_namespaced_resource
 from lightkube.resources.rbac_authorization_v1 import RoleBinding
-
-from profiles_management.helpers.k8s import client, get_name, get_namespace
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +17,26 @@ AuthorizationPolicy = create_namespaced_resource(
 )
 
 
-def list_contributor_rolebindings(namespace="") -> List[RoleBinding]:
+def has_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> bool:
+    """Check if resource has "user" and "role" KFAM annotations."""
+    if resource.metadata and resource.metadata.annotations:
+        return "role" in resource.metadata.annotations and "user" in resource.metadata.annotations
+
+    return False
+
+
+def resource_is_for_profile_owner(resource: GenericNamespacedResource | RoleBinding) -> bool:
+    """Check if the resource is for the Profile owner."""
+    if resource.metadata:
+        return (
+            resource.metadata.name == "ns-owner-access-istio"
+            or resource.metadata.name == "namespaceAdmin"
+        )
+
+    return False
+
+
+def list_contributor_rolebindings(client: Client, namespace="") -> List[RoleBinding]:
     """Return a list of KFAM RoleBindings.
 
     Only RoleBindings which have "role" and "user" annotations will be returned.
@@ -27,6 +44,7 @@ def list_contributor_rolebindings(namespace="") -> List[RoleBinding]:
     returned."
 
     Args:
+        client: The lightkube client to use
         namespace: The namespace to list contributors from. For all namespaces
                    you can pass an empty string "".
 
@@ -34,52 +52,20 @@ def list_contributor_rolebindings(namespace="") -> List[RoleBinding]:
         A list of RoleBindings that are used from KFAM for contributors.
     """
     role_bindings = client.list(RoleBinding, namespace=namespace)
-    contributor_rbs = []
-    for rb in role_bindings:
-        if not rb.metadata:
-            continue
 
-        # We exclude the RB created by the Profile Controller for the
-        # owner of the Profile
-        # https://github.com/kubeflow/kubeflow/issues/6576
-        if rb.metadata.name == "namespaceAdmin":
-            continue
-
-        if not rb.metadata.annotations:
-            continue
-
-        if "role" not in rb.metadata.annotations:
-            continue
-
-        if "user" not in rb.metadata.annotations:
-            continue
-
-        contributor_rbs.append(rb)
-
-    return contributor_rbs
+    # We exclude the RB created by the Profile Controller for the
+    # owner of the Profile
+    # https://github.com/kubeflow/kubeflow/issues/6576
+    return [
+        rb
+        for rb in role_bindings
+        if has_kfam_annotations(rb) and not resource_is_for_profile_owner(rb)
+    ]
 
 
-def delete_contributor_rolebinding(rb: RoleBinding):
-    """Delete provided RoleBinding.
-
-    If the object doesn't exist anymore, the code will handle the 404 error.
-
-    Args:
-        rb: The RoleBinding that should be deleted.
-    """
-    name = get_name(rb)
-    namespace = get_namespace(rb)
-    try:
-        client.delete(RoleBinding, name=name, namespace=namespace)
-    except ApiError as e:
-        if e.status.code == 404:
-            log.info("RoleBinding %s/%s doesn't exist.", namespace, name)
-            return
-
-        raise e
-
-
-def list_contributor_authorization_policies(namespace="") -> List[GenericNamespacedResource]:
+def list_contributor_authorization_policies(
+    client: Client, namespace=""
+) -> List[GenericNamespacedResource]:
     """Return a list of KFAM AuthorizationPolicies.
 
     Only AuthorizationPolicies which have "role" and "user" annotations will be returned.
@@ -87,6 +73,7 @@ def list_contributor_authorization_policies(namespace="") -> List[GenericNamespa
     returned."
 
     Args:
+        client: The lightkube client to use
         namespace: The namespace to list contributors from. For all namespaces
                    you can use "" value.
 
@@ -94,46 +81,12 @@ def list_contributor_authorization_policies(namespace="") -> List[GenericNamespa
         A list of AuthorizationPolicies that are used from KFAM for contributors.
     """
     authorization_policies = client.list(AuthorizationPolicy, namespace=namespace)
-    contributor_aps: List[GenericNamespacedResource] = []
-    for ap in authorization_policies:
-        if not ap.metadata:
-            continue
 
-        # We exclude the AP created by the Profile Controller for the
-        # owner of the Profile
-        # https://github.com/kubeflow/kubeflow/issues/6576
-        if ap.metadata.name == "ns-owner-access-istio":
-            continue
-
-        if not ap.metadata.annotations:
-            continue
-
-        if "role" not in ap.metadata.annotations:
-            continue
-
-        if "user" not in ap.metadata.annotations:
-            continue
-
-        contributor_aps.append(ap)
-
-    return contributor_aps
-
-
-def delete_contributor_authorization_policy(ap: GenericNamespacedResource):
-    """Delete provided AuthorizationPolicies.
-
-    If the object doesn't exist anymore, the code will handle the 404 error.
-
-    Args:
-        ap: The AuthorizationPolicy that should be deleted.
-    """
-    name = get_name(ap)
-    namespace = get_namespace(ap)
-    try:
-        client.delete(AuthorizationPolicy, name=name, namespace=namespace)
-    except ApiError as e:
-        if e.status.code == 404:
-            log.info("AuthorizationPolicy %s/%s doesn't exist.", namespace, name)
-            return
-
-        raise e
+    # We exclude the AP created by the Profile Controller for the
+    # owner of the Profile
+    # https://github.com/kubeflow/kubeflow/issues/6576
+    return [
+        ap
+        for ap in authorization_policies
+        if has_kfam_annotations(ap) and not resource_is_for_profile_owner(ap)
+    ]

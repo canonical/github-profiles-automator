@@ -12,12 +12,12 @@ based on a PMR.
 import logging
 from typing import Dict
 
+from charmed_kubeflow_chisme.lightkube.batch import delete_many
+from lightkube import Client
 from lightkube.generic_resource import GenericGlobalResource
 
 from profiles_management.helpers.k8s import get_name
 from profiles_management.helpers.kfam import (
-    delete_contributor_authorization_policy,
-    delete_contributor_rolebinding,
     list_contributor_authorization_policies,
     list_contributor_rolebindings,
 )
@@ -25,6 +25,7 @@ from profiles_management.helpers.profiles import list_profiles
 from profiles_management.pmr.classes import ProfilesManagementRepresentation
 
 log = logging.getLogger(__name__)
+client = Client(field_manager="profiles-automator-lightkube")
 
 
 def remove_access_to_stale_profile(profile: GenericGlobalResource):
@@ -37,22 +38,16 @@ def remove_access_to_stale_profile(profile: GenericGlobalResource):
     Args:
         profile: The lightkube Profile object from which all contributors should be removed.
     """
-    ns = get_name(profile)
-    contributor_rbs = list_contributor_rolebindings(ns)
+    profile_namespace = get_name(profile)
 
     log.info("Deleting all KFAM RoleBindings")
-    for rb in contributor_rbs:
-        log.info("Deleting RoleBinding: %s/%s" % (ns, get_name(rb)))
-        delete_contributor_rolebinding(rb)
-
+    contributor_rbs = list_contributor_rolebindings(client, profile_namespace)
+    delete_many(client, contributor_rbs, logger=log)
     log.info("Deleted all KFAM RoleBindings")
 
     log.info("Deleting all KFAM AuthorizationPolicies")
-    existing_aps = list_contributor_authorization_policies()
-    for ap in existing_aps:
-        log.info("Deleting AuthorizationPolicy: %s/%s" % (ns, get_name(ap)))
-        delete_contributor_authorization_policy(ap)
-
+    existing_aps = list_contributor_authorization_policies(client)
+    delete_many(client, existing_aps, logger=log)
     log.info("Deleted all KFAM AuthorizationPolicies")
 
 
@@ -77,13 +72,11 @@ def create_or_update_profiles(pmr: ProfilesManagementRepresentation):
     log.info("Fetching all Profiles in the cluster")
 
     existing_profiles: Dict[str, GenericGlobalResource] = {}
-    for profile in list_profiles():
+    for profile in list_profiles(client):
         existing_profiles[get_name(profile)] = profile
 
     log.info("Removing access to all stale Profiles")
     for profile_name, existing_profile in existing_profiles.items():
-        if pmr.has_profile(profile_name):
-            continue
-
-        logging.info("Profile %s not in PMR. Will remove access.", profile_name)
-        remove_access_to_stale_profile(existing_profile)
+        if not pmr.has_profile(profile_name):
+            logging.info("Profile %s not in PMR. Will remove access.", profile_name)
+            remove_access_to_stale_profile(existing_profile)
