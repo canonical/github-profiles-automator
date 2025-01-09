@@ -55,7 +55,7 @@ resources:
   git-sync-image:
     type: oci-image
     description: OCI image for the 'git-sync' container
-    upstream-source: registry.k8s.io/git-sync/git-sync:v4.3.0        
+    upstream-source: registry.k8s.io/git-sync/git-sync:v4.4.0
 
 storage:
   content-from-git:
