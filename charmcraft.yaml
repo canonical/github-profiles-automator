@@ -28,7 +28,7 @@ config:
         operate.
       type: string
     sync-period:
-      default: 30
+      default: 60
       description: |
         How long to wait between sync attempts. 
       type: int
