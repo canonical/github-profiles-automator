@@ -67,6 +67,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             )
         )
 
+        logger.warning("Running...")
         self.pebble_service_container = self.charm_reconciler.add(
             component=GitSyncPebbleService(
                 charm=self,
@@ -98,11 +99,14 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             errors.
         """
         ssh_key_secret_id = str(self.config.get("ssh-key-secret-id"))
+        logger.warning("Trying to get SSH key...")
         try:
             ssh_key_secret = self.model.get_secret(id=ssh_key_secret_id)
+            logger.warning("Found secret!")
             ssh_key = str(ssh_key_secret.get_content(refresh=True)["ssh-key"])
             # SSH key requires a newline at the end, so ensure it has one
             ssh_key += "\n\n"
+            logger.warning("Found SSH key!")
             return ssh_key
         except (ops.SecretNotFoundError, ops.model.ModelError):
             raise ValueError("The SSH key does not exist")
@@ -134,7 +138,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         https_url_pattern = r"^https?://[a-zA-Z0-9.-]+/[\w.-]+/[\w.-]+(\.git)?$"
         self.repository_type = RepositoryType.HTTP
         if not re.match(https_url_pattern, str(self.config["repository"])):
-            raise ErrorWithStatus("Error: Repository isn't a valid Github URL", ops.BlockedStatus)
+            raise ErrorWithStatus("Error: Repository isn't a valid GitHub URL", ops.BlockedStatus)
 
 
 if __name__ == "__main__":
