@@ -126,21 +126,6 @@ class GitSyncPebbleService(PebbleServiceComponent):
                         checks=checks,
                     )
                 )
-                # return Layer(
-                #     {
-                #         "summary": "git-sync layer",
-                #         "description": "pebble config layer for git-sync",
-                #         "services": {
-                #             self.service_name: {
-                #                 "override": "replace",
-                #                 "summary": "git-sync",
-                #                 "command": f"bash -c '{command}'",
-                #                 "startup": "enabled",
-                #             }
-                #         },
-                #         "checks": checks,
-                #     }
-                # )
             else:
                 raise ValueError(f"{self.name}: inputs are not correctly provided")
         except Exception as err:
