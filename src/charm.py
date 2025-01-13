@@ -89,7 +89,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         """Retrieve the SSH key value from the Juju secrets, using the ssh-key-secret-id config.
 
         Returns:
-            str: The SSH key, or None if the Juju secret doesn't exist, or the config
+            The SSH key as a string, or None if the Juju secret doesn't exist or the config
             hasn't been set.
 
         Raises:
