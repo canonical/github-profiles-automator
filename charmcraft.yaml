@@ -29,7 +29,7 @@ config:
       type: string
     git-revision:
       default: "HEAD"
-      decsription: |
+      description: |
         The git revision to check out.
       type: string
     sync-period:
