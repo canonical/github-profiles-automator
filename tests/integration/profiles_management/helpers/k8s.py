@@ -43,27 +43,6 @@ def get_name(res: GenericNamespacedResource | GenericGlobalResource) -> str:
     return res.metadata.name
 
 
-def get_namespace(res: GenericNamespacedResource) -> str:
-    """Return the name from a generic lightkube resource.
-
-    Args:
-        res: The namespaced resource to get the namespace of
-
-    Raises:
-        ValueError: if the object doesn't have metadata or metadata.namespace
-
-    Returns:
-        The namespace of the resource from its metadata.
-    """
-    if not res.metadata:
-        pytest.xfail("Couldn't detect namespace, object has no metadata: %s" % res)
-
-    if not res.metadata.namespace:
-        pytest.xfail("Couldn't detect namespace from metadata: %s" % res)
-
-    return res.metadata.namespace
-
-
 def load_namespaced_objects_from_file(
     file_path: str, context: dict = {}
 ) -> List[codecs.AnyResource]:

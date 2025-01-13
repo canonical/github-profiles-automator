@@ -19,7 +19,14 @@ codecs.resource_registry.register(AuthorizationPolicy)
 
 
 def has_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> bool:
-    """Check if resource has "user" and "role" KFAM annotations."""
+    """Check if resource has "user" and "role" KFAM annotations.
+
+    Args:
+        resource: The RoleBinding or AuthorizationPolicy to check if it has KFAM annotations.
+
+    Returns:
+        A boolean if the provided resources has a `role` and `user` annotation.
+    """
     if resource.metadata and resource.metadata.annotations:
         return "role" in resource.metadata.annotations and "user" in resource.metadata.annotations
 
@@ -27,7 +34,14 @@ def has_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> b
 
 
 def resource_is_for_profile_owner(resource: GenericNamespacedResource | RoleBinding) -> bool:
-    """Check if the resource is for the Profile owner."""
+    """Check if the resource is for the Profile owner.
+
+    Args:
+        resource: The RoleBinding or AuthorizationPolicy to check if it belongs to a Profile owner.
+
+    Returns:
+        A boolean representing if the provided resource belongs to the Profile owner.
+    """
     if resource.metadata:
         return (
             resource.metadata.name == "ns-owner-access-istio"

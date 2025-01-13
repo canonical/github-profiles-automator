@@ -19,6 +19,22 @@ Profile = create_global_resource(
 )
 
 
+def get_profile(client: Client, name: str) -> GenericGlobalResource:
+    """Get a Profile from the cluster.
+
+    Args:
+        client: The lightkube client to use.
+        name: The name of the Profile to get.
+
+    Raises:
+        ApiError: If there are errors fetching the Profile (i.e. doesn't exist)
+
+    Returns:
+        The Profile lightkube object from the cluster.
+    """
+    return client.get(Profile, name=name)
+
+
 def load_profile_from_file(file_path: str, context: dict = {}) -> codecs.AnyResource:
     """Load only Profiles from a YAML file.
 
