@@ -1,6 +1,21 @@
 """Generic helpers for manipulating K8s objects, via lightkube."""
 
+import logging
+
+import tenacity
+from lightkube import Client
+from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import GenericGlobalResource, GenericNamespacedResource
+from lightkube.resources.core_v1 import Namespace
+
+log = logging.getLogger(__name__)
+
+
+# For errors when a Namespace exists while it shouldn't
+class ObjectStillExistsError(Exception):
+    """Exception for when a K8s object exists, while it should have been removed."""
+
+    pass
 
 
 def get_name(res: GenericNamespacedResource | GenericGlobalResource) -> str:
@@ -22,3 +37,32 @@ def get_name(res: GenericNamespacedResource | GenericGlobalResource) -> str:
         raise ValueError("Couldn't detect name, object has no name field: %s" % res)
 
     return res.metadata.name
+
+
+@tenacity.retry(stop=tenacity.stop_after_delay(300), wait=tenacity.wait_fixed(5), reraise=True)
+def ensure_namespace_is_deleted(namespace: str, client: Client):
+    """Check if the name doesn't exist with retries.
+
+    The function will keep retrying until the namespace is deleted, and handle the
+    404 error once it gets deleted.
+
+    Args:
+        namespace: The namespace to be checked if it is deleted.
+        client: The lightkube client to use for talking to K8s.
+
+    Raises:
+        ApiError: From lightkube, if there was an error aside from 404.
+        ObjectStillExistsError: If the Profile's namespace was not deleted after retries.
+    """
+    log.info("Checking if namespace exists: %s", namespace)
+    try:
+        client.get(Namespace, name=namespace)
+        log.info('Namespace "%s" exists, retrying...', namespace)
+        raise ObjectStillExistsError("Namespace %s is not deleted.")
+    except ApiError as e:
+        if e.status.code == 404:
+            log.info('Namespace "%s" doesn\'t exist!', namespace)
+            return
+        else:
+            # Raise any other error
+            raise
