@@ -109,28 +109,32 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             return None
 
     def _validate_repository_config(self):
-        """Parse a repository string and raise appropriate errors."""
+        """Parse a repository string and raise appropriate errors.
+
+        Raises:
+            ErrorWithStatus: If the config `repository` is empty, an invalid GitHub URL, or
+            there is a missing SSH key when needed.
+        """
         if self.config["repository"] == "":
             logger.warning("Charm is Blocked due to empty value of `repository`")
             raise ErrorWithStatus("Config `repository` cannot be empty.", ops.BlockedStatus)
 
         if is_ssh_url(str(self.config["repository"])):
             self.repository_type = RepositoryType.SSH
-            if self.ssh_key:
-                # If there is an SSH key, we push it to the workload container
-                self.files_to_push.append(
-                    LazyContainerFileTemplate(
-                        source_template=self.ssh_key,
-                        destination_path=SSH_KEY_DESTINATION_PATH,
-                        permissions=SSH_KEY_PERMISSIONS,
-                    )
-                )
-                return
-            else:
+            if not self.ssh_key:
                 raise ErrorWithStatus(
                     "To connect via an SSH URL you need to provide an SSH key.",
                     ops.BlockedStatus,
                 )
+            # If there is an SSH key, we push it to the workload container
+            self.files_to_push.append(
+                LazyContainerFileTemplate(
+                    source_template=self.ssh_key,
+                    destination_path=SSH_KEY_DESTINATION_PATH,
+                    permissions=SSH_KEY_PERMISSIONS,
+                )
+            )
+            return
 
         self.repository_type = RepositoryType.HTTPS
         if not is_https_url(str(self.config["repository"])):
