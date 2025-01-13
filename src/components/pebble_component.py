@@ -21,7 +21,7 @@ class RepositoryType(Enum):
     """Simple Enum to describe the different types of URLs the charm supports."""
 
     SSH = 1
-    HTTP = 2
+    HTTPS = 2
 
 
 class GitSyncInputs(BaseModel):
@@ -56,32 +56,28 @@ class GitSyncPebbleService(PebbleServiceComponent):
 
     def generate_check_command(self) -> str | None:
         """Generate the health check command depending on the type of URL provided."""
-        try:
-            if self._inputs_getter is not None:
-                inputs: GitSyncInputs = self._inputs_getter()
-                if inputs.REPOSITORY_TYPE == RepositoryType.SSH:
-                    return " ".join(
-                        [
-                            "ssh",
-                            "-i /etc/git-secret/ssh",
-                            "-o StrictHostKeyChecking=no",
-                            "git@github.com;",
-                            "[ $? -ne 255 ]",
-                        ]
-                    )
-                elif inputs.REPOSITORY_TYPE == RepositoryType.HTTP:
-                    return " ".join(
-                        [
-                            "git",
-                            "ls-remote",
-                            f"{inputs.REPOSITORY};",
-                            "[ $? -eq 0 ]",
-                        ]
-                    )
-                else:
-                    raise ValueError(f"Unsupported repository type: {inputs.REPOSITORY_TYPE}")
-        except Exception as err:
-            raise ValueError(f"{self.name}: inputs are not correctly provided") from err
+        if self._inputs_getter is None:
+            return
+        inputs: GitSyncInputs = self._inputs_getter()
+        if inputs.REPOSITORY_TYPE == RepositoryType.SSH:
+            return " ".join(
+                [
+                    "ssh",
+                    "-i /etc/git-secret/ssh",
+                    "-o StrictHostKeyChecking=no",
+                    "git@github.com;",
+                    "[ $? -ne 255 ]",
+                ]
+            )
+        elif inputs.REPOSITORY_TYPE == RepositoryType.HTTPS:
+            return " ".join(
+                [
+                    "git",
+                    "ls-remote",
+                    f"{inputs.REPOSITORY};",
+                    "[ $? -eq 0 ]",
+                ]
+            )
 
     def get_layer(self) -> Layer:
         """Return the Pebble layer for this component."""

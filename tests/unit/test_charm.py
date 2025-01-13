@@ -26,7 +26,7 @@ def test_empty_repository(harness: ops.testing.Harness[GithubProfilesAutomatorCh
 
     # Assert
     assert isinstance(harness.model.unit.status, BlockedStatus)
-    assert "Error: config `repository` cannot be empty" in harness.charm.model.unit.status.message
+    assert "Config `repository` cannot be empty." in harness.charm.model.unit.status.message
 
 
 def test_invalid_repository(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
@@ -37,7 +37,9 @@ def test_invalid_repository(harness: ops.testing.Harness[GithubProfilesAutomator
 
     # Assert
     assert isinstance(harness.model.unit.status, BlockedStatus)
-    assert "Error: Repository isn't a valid GitHub URL" in harness.charm.model.unit.status.message
+    assert (
+        "Config `repository` isn't a valid GitHub URL." in harness.charm.model.unit.status.message
+    )
 
 
 def test_not_leader(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
@@ -60,7 +62,7 @@ def test_no_ssh_key(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
     # Assert
     assert isinstance(harness.charm.model.unit.status, BlockedStatus)
     assert (
-        "Error: To connect via an SSH URL you need to provide an SSH key"
+        "To connect via an SSH URL you need to provide an SSH key."
         in harness.charm.model.unit.status.message
     )
 

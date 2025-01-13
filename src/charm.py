@@ -9,7 +9,6 @@ a Profiles Representation (PMR) that is hosted as a file in a GitHub repo.
 """
 
 import logging
-import re
 
 import ops
 from charmed_kubeflow_chisme.components import ContainerFileTemplate, LazyContainerFileTemplate
@@ -43,7 +42,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         self.files_to_push = []
 
         try:
-            self._parse_repository_config()
+            self._validate_repository_config()
         except ErrorWithStatus as e:
             self.unit.status = e.status
             return
@@ -67,7 +66,6 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             )
         )
 
-        logger.warning("Running...")
         self.pebble_service_container = self.charm_reconciler.add(
             component=GitSyncPebbleService(
                 charm=self,
@@ -87,11 +85,11 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         self.charm_reconciler.install_default_event_handlers()
 
     @property
-    def ssh_key(self) -> str:
+    def ssh_key(self) -> str | None:
         """Retrieve the SSH key value from the Juju secrets, using the ssh-key-secret-id config.
 
         Returns:
-            str: The SSH key as a string, or None if the Juju secret doesn't exist, or the config
+            str: The SSH key, or None if the Juju secret doesn't exist, or the config
             hasn't been set.
 
         Raises:
@@ -99,25 +97,24 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             errors.
         """
         ssh_key_secret_id = str(self.config.get("ssh-key-secret-id"))
-        logger.warning("Trying to get SSH key...")
         try:
             ssh_key_secret = self.model.get_secret(id=ssh_key_secret_id)
-            logger.warning("Found secret!")
             ssh_key = str(ssh_key_secret.get_content(refresh=True)["ssh-key"])
             # SSH key requires a newline at the end, so ensure it has one
             ssh_key += "\n\n"
-            logger.warning("Found SSH key!")
             return ssh_key
         except (ops.SecretNotFoundError, ops.model.ModelError):
+            logger.warning("The SSH key does not exist")
+            return None
             raise ValueError("The SSH key does not exist")
 
-    def _parse_repository_config(self):
+    def _validate_repository_config(self):
         """Parse a repository string and raise appropriate errors."""
         if self.config["repository"] == "":
-            raise ErrorWithStatus("Error: config `repository` cannot be empty", ops.BlockedStatus)
-        # Check if the repository is a valid SSH URL
-        ssh_url_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+:[\w./~-]+$"
-        if re.match(ssh_url_pattern, str(self.config["repository"])):
+            logger.warning("Charm is Blocked due to empty value of `repository`")
+            raise ErrorWithStatus("Config `repository` cannot be empty.", ops.BlockedStatus)
+
+        if is_ssh_url(str(self.config["repository"])):
             self.repository_type = RepositoryType.SSH
             try:
                 # If there is an SSH key, we push it to the workload container
@@ -130,15 +127,54 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 )
                 return
             except ValueError:
+                logger.warning("Charm is Blocked due to missing SSH key")
                 raise ErrorWithStatus(
-                    "Error: To connect via an SSH URL you need to provide an SSH key",
+                    "To connect via an SSH URL you need to provide an SSH key.",
                     ops.BlockedStatus,
                 )
-        # Check if the repository is a valid HTTP URL
-        https_url_pattern = r"^https?://[a-zA-Z0-9.-]+/[\w.-]+/[\w.-]+(\.git)?$"
-        self.repository_type = RepositoryType.HTTP
-        if not re.match(https_url_pattern, str(self.config["repository"])):
-            raise ErrorWithStatus("Error: Repository isn't a valid GitHub URL", ops.BlockedStatus)
+
+        self.repository_type = RepositoryType.HTTPS
+        if not is_https_url(str(self.config["repository"])):
+            logger.warning("Charm is Blocked due to incorrect value of `repository`")
+            raise ErrorWithStatus(
+                "Config `repository` isn't a valid GitHub URL.", ops.BlockedStatus
+            )
+
+
+def is_https_url(url: str) -> bool:
+    """Check if a given string is a valid HTTPS URL for a GitHub repo.
+
+    Args:
+        url: The URL to check.
+
+    Returns:
+        True if the string is valid HTTPS URL for a GitHub repo, False otherwise.
+    """
+    # Check if the URL starts with 'https://github.com'
+    if not url.startswith("https://github.com/"):
+        return False
+    # Check if the URL ends with '.git'
+    if not url.endswith(".git"):
+        return False
+    return True
+
+
+def is_ssh_url(url: str) -> bool:
+    """Check if a given string is a valid SSH URL for a GitHub repo.
+
+    Args:
+        url: The URL to check.
+
+    Returns:
+        True if the string is valid SSH URL for a GitHub repo, False otherwise.
+    """
+    if not url.startswith("git@github.com:"):
+        return False
+    # Get the part after git@github.com
+    path = url.split(":", 1)[-1]
+    if "/" not in path:
+        return False
+    return True
 
 
 if __name__ == "__main__":
