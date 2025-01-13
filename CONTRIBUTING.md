@@ -23,6 +23,41 @@ tox -e integration   # integration tests
 tox                  # runs 'fmt', 'lint', 'static', and 'unit' environments
 ```
 
+## Integration Tests
+
+When running/developing integration tests there will be times when the tests fail. During teardown
+of the integration tests the following things happen:
+1. The Juju model that the Profiles Controller charm was deployed gets deleted
+2. The Profile CRs created during tests will still be there
+
+Deleting then a Profile will result in the Profile to never be deleted. This is because:
+1. The created Profile has a finalizer
+2. The Profile Controller that should be responsible for removing the finaliser is not deployed
+3. K8s waits indefinitely until the finaliser is removed, to remove the Profile object
+
+While developing tests locally there are two approaches to go about this:
+
+#### Have Profiles Controller always deployed
+
+In this case you'll need to ensure the Profiles controller is always running. This could be achieved by:
+1. installing the `kubeflow-profiles` charm in a separate model
+2. commenting out the `await deploy_profiles_controller` command
+
+The above will be the fastest way to run the integration tests a lot of times, as you both save time
+from re-deploying the Profiles Controller as well as the Profiles can now be deleted as expected with
+`kubectl`.
+
+You can install the Profiles Controller with the following command:
+```bash
+juju deploy kubeflow-profiles --channel 1.9/stable --trust
+```
+
+#### Remove finaliser from Profile
+
+If you don't want to mess with your cluster and just get the Profile deleted, then you can
+remove the `metadata.finalizers` field in the Profile and K8s will remove the Profile, and garbage
+collect the created namespace.
+
 ## Build the charm
 
 Build the charm in this git repository using:
