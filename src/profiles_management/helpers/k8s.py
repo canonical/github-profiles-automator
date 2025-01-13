@@ -66,3 +66,30 @@ def ensure_namespace_is_deleted(namespace: str, client: Client):
         else:
             # Raise any other error
             raise
+
+
+@tenacity.retry(stop=tenacity.stop_after_delay(60), wait=tenacity.wait_fixed(2), reraise=True)
+def ensure_namespace_exists(ns: str, client: Client):
+    """Check if the name exists with retries.
+
+    The retries will catch the 404 errors if the namespace doesn't exist.
+
+    Args:
+        ns: The namespace to ensure exists.
+        client: The lightkube client to use.
+
+    Raises:
+        ApiError: API errors that might occur while trying to fetch the Namespace.
+    """
+    log.info("Checking if namespace exists: %s", ns)
+    try:
+        client.get(Namespace, name=ns)
+        log.info('Namespace "%s" exists!', ns)
+        return ns
+    except ApiError as e:
+        if e.status.code == 404:
+            log.info('Namespace "%s" doesn\'t exist, retrying... ', ns)
+            raise
+        else:
+            # Raise any other error
+            raise

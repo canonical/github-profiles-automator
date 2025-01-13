@@ -16,12 +16,12 @@ from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from lightkube import Client
 from lightkube.generic_resource import GenericGlobalResource
 
+from profiles_management.helpers import profiles
 from profiles_management.helpers.k8s import get_name
 from profiles_management.helpers.kfam import (
     list_contributor_authorization_policies,
     list_contributor_rolebindings,
 )
-from profiles_management.helpers.profiles import list_profiles
 from profiles_management.pmr.classes import ProfilesManagementRepresentation
 
 log = logging.getLogger(__name__)
@@ -73,11 +73,24 @@ def create_or_update_profiles(client: Client, pmr: ProfilesManagementRepresentat
     log.info("Fetching all Profiles in the cluster")
 
     existing_profiles: Dict[str, GenericGlobalResource] = {}
-    for profile in list_profiles(client):
+    for profile in profiles.list_profiles(client):
         existing_profiles[get_name(profile)] = profile
 
-    log.info("Removing access to all stale Profiles")
+    log.info("Removing access to all stale Profiles.")
     for profile_name, existing_profile in existing_profiles.items():
         if not pmr.has_profile(profile_name):
             logging.info("Profile %s not in PMR. Will remove access.", profile_name)
             remove_access_to_stale_profile(client, existing_profile)
+
+    # Create or update Profile CRs
+    log.info("Creating or updating Profile CRs based on PMR.")
+    for profile_name, profile in pmr.profiles.items():
+        log.info("Handling Profile '%s' from PMR.", profile_name)
+
+        existing_profile = existing_profiles.get(profile_name, None)
+        if existing_profile is None:
+            log.info("No Profile CR exists for Profile %s, creating it.", profile_name)
+            existing_profile = profiles.apply_pmr_profile(client, profile)
+
+        log.info("Creating or updating the ResourceQuota for the Profile.")
+        profiles.update_resource_quota(client, existing_profile, profile)
