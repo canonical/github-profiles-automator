@@ -92,6 +92,9 @@ class GitSyncPebbleService(PebbleServiceComponent):
 
         Returns:
             The Pebble layer of this component.
+
+        Raises:
+            ValueError: If the _inputs_getter function hasn't been provided
         """
         if self._inputs_getter is None:
             raise ValueError(f"{self.name}: inputs are not correctly provided")
