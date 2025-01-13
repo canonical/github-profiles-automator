@@ -106,7 +106,6 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         except (ops.SecretNotFoundError, ops.model.ModelError):
             logger.warning("The SSH key does not exist")
             return None
-            raise ValueError("The SSH key does not exist")
 
     def _validate_repository_config(self):
         """Parse a repository string and raise appropriate errors."""
@@ -116,7 +115,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
 
         if is_ssh_url(str(self.config["repository"])):
             self.repository_type = RepositoryType.SSH
-            try:
+            if self.ssh_key:
                 # If there is an SSH key, we push it to the workload container
                 self.files_to_push.append(
                     LazyContainerFileTemplate(
@@ -126,8 +125,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                     )
                 )
                 return
-            except ValueError:
-                logger.warning("Charm is Blocked due to missing SSH key")
+            else:
                 raise ErrorWithStatus(
                     "To connect via an SSH URL you need to provide an SSH key.",
                     ops.BlockedStatus,

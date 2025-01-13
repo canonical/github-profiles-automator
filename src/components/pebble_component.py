@@ -36,7 +36,11 @@ class GitSyncPebbleService(PebbleServiceComponent):
     """Define the PebbleService component for this charm."""
 
     def get_status(self) -> StatusBase:
-        """Return the status of this component."""
+        """Return the status of this component.
+
+        Returns:
+            The current status of the component depending on its state
+        """
         if not self.pebble_ready:
             return WaitingStatus("Waiting for Pebble to be ready.")
 
@@ -55,7 +59,11 @@ class GitSyncPebbleService(PebbleServiceComponent):
         return ActiveStatus()
 
     def generate_check_command(self) -> str | None:
-        """Generate the health check command depending on the type of URL provided."""
+        """Generate the health check command depending on the type of URL provided.
+
+        Returns:
+            The health check to run, or None if we don't have the appropriate inputs
+        """
         if self._inputs_getter is None:
             return
         inputs: GitSyncInputs = self._inputs_getter()
@@ -80,49 +88,49 @@ class GitSyncPebbleService(PebbleServiceComponent):
             )
 
     def get_layer(self) -> Layer:
-        """Return the Pebble layer for this component."""
-        try:
-            if self._inputs_getter is not None:
-                inputs: GitSyncInputs = self._inputs_getter()
+        """Configure the Pebble layer for this component.
 
-                command = " ".join(
-                    [
-                        "/git-sync",
-                        f"--repo={inputs.REPOSITORY}",
-                        "--depth=1",
-                        f"--period={inputs.SYNC_PERIOD}s",
-                        "--link=cloned-repo",
-                        "--root=/git",
-                        "--ssh-known-hosts=false",
-                        "--verbose=9",
-                        "--exechook-command=/git-sync-exechook.sh",
-                    ]
-                )
+        Returns:
+            The Pebble layer of this component.
+        """
+        if self._inputs_getter is None:
+            raise ValueError(f"{self.name}: inputs are not correctly provided")
+        inputs: GitSyncInputs = self._inputs_getter()
 
-                check_command = self.generate_check_command()
+        command = " ".join(
+            [
+                "/git-sync",
+                f"--repo={inputs.REPOSITORY}",
+                "--depth=1",
+                f"--period={inputs.SYNC_PERIOD}s",
+                "--link=cloned-repo",
+                "--root=/git",
+                "--ssh-known-hosts=false",
+                "--verbose=9",
+                "--exechook-command=/git-sync-exechook.sh",
+            ]
+        )
 
-                checks = {
-                    "check-repository": CheckDict(
-                        override="replace",
-                        exec={"command": f"bash -c '{check_command}'"},
-                    )
-                }
-                return Layer(
-                    LayerDict(
-                        summary="git-sync layer",
-                        description="pebble config layer for git-sync",
-                        services={
-                            self.service_name: {
-                                "override": "replace",
-                                "summary": "git-sync",
-                                "command": f"bash -c '{command}'",
-                                "startup": "enabled",
-                            }
-                        },
-                        checks=checks,
-                    )
-                )
-            else:
-                raise ValueError(f"{self.name}: inputs are not correctly provided")
-        except Exception as err:
-            raise ValueError(f"{self.name}: inputs are not correctly provided") from err
+        check_command = self.generate_check_command()
+
+        checks = {
+            "check-repository": CheckDict(
+                override="replace",
+                exec={"command": f"bash -c '{check_command}'"},
+            )
+        }
+        return Layer(
+            LayerDict(
+                summary="git-sync layer",
+                description="pebble config layer for git-sync",
+                services={
+                    self.service_name: {
+                        "override": "replace",
+                        "summary": "git-sync",
+                        "command": f"bash -c '{command}'",
+                        "startup": "enabled",
+                    }
+                },
+                checks=checks,
+            )
+        )
