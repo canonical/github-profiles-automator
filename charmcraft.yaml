@@ -27,6 +27,11 @@ config:
         The URL of the repository to fetch. Must be configured for the charm to
         operate.
       type: string
+    git-revision:
+      default: "HEAD"
+      decsription: |
+        The git revision to check out.
+      type: string
     sync-period:
       default: 60
       description: |

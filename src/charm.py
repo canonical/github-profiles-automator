@@ -74,6 +74,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 service_name=self.pebble_service_name,
                 files_to_push=self.files_to_push,
                 inputs_getter=lambda: GitSyncInputs(
+                    GIT_REVISION=str(self.config["git-revision"]),
                     REPOSITORY=str(self.config["repository"]),
                     REPOSITORY_TYPE=self.repository_type,
                     SYNC_PERIOD=int(self.config["sync-period"]),

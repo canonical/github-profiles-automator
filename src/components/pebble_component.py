@@ -27,6 +27,7 @@ class RepositoryType(Enum):
 class GitSyncInputs(BaseModel):
     """Defines the required inputs for GitSyncPebbleService."""
 
+    GIT_REVISION: str
     REPOSITORY: str
     REPOSITORY_TYPE: RepositoryType
     SYNC_PERIOD: int
@@ -49,8 +50,8 @@ class GitSyncPebbleService(PebbleServiceComponent):
         service_info = services["git-sync"]
         if service_info.current == "backoff":
             return BlockedStatus(
-                f"{service_info.name} fails to start. "
-                "You may need to configure the charm and add an SSH key."
+                f"{service_info.name} could not connect to the repository. "
+                "You may need to configure the charm or add an SSH key."
             )
         elif service_info.current == "error":
             return BlockedStatus(
@@ -104,6 +105,7 @@ class GitSyncPebbleService(PebbleServiceComponent):
             [
                 "/git-sync",
                 f"--repo={inputs.REPOSITORY}",
+                f"--ref={inputs.GIT_REVISION}",
                 "--depth=1",
                 f"--period={inputs.SYNC_PERIOD}s",
                 "--link=cloned-repo",
