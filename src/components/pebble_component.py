@@ -83,7 +83,9 @@ class GitSyncPebbleService(PebbleServiceComponent):
                 [
                     "git",
                     "ls-remote",
-                    f"{inputs.REPOSITORY};",
+                    "--exit-code",
+                    f"{inputs.REPOSITORY}",
+                    f"{inputs.GIT_REVISION};",
                     "[ $? -eq 0 ]",
                 ]
             )
