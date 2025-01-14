@@ -32,7 +32,7 @@ async def deploy_profiles_controller(ops_test: OpsTest):
     if PROFILES_CHARM in ops_test.model.applications:
         log.info("Profiles Controller charm already exists, no need to re-deploy")
         return
-        
+
     log.info("Deploying the Profiles Controller charm.")
     await ops_test.model.deploy(PROFILES_CHARM, channel=PROFILES_CHANNEL, trust=PROFILES_TRUST)
 
