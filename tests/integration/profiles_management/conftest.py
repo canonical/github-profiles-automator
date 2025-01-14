@@ -29,7 +29,7 @@ async def deploy_profiles_controller(ops_test: OpsTest):
         pytest.fail("ops_test has a None model", pytrace=False)
 
     if PROFILES_CHARM in ops_test.model.applications:
-        log.info("Profiles Controller charm already exists, no need to re-deploy")
+        log.info("Profiles Controller charm already exists, no need to re-deploy.")
         return
 
     log.info("Deploying the Profiles Controller charm.")
