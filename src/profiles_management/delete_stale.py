@@ -8,8 +8,8 @@ import logging
 
 from lightkube import Client
 
+from profiles_management.get_stale import get_stale_profiles
 from profiles_management.helpers import profiles
-from profiles_management.list_stale import get_stale_profiles
 from profiles_management.pmr.classes import ProfilesManagementRepresentation
 
 log = logging.getLogger(__name__)
