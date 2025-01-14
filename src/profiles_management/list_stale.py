@@ -6,18 +6,16 @@ in the PMR.
 
 import logging
 
-from lightkube import Client
 from lightkube.generic_resource import GenericGlobalResource
 
-from profiles_management.helpers.k8s import get_name
+from profiles_management.helpers.k8s import client, get_name
 from profiles_management.helpers.profiles import list_profiles
 from profiles_management.pmr.classes import ProfilesManagementRepresentation
 
 log = logging.getLogger(__name__)
-client = Client(field_manager="profiles-automator-lightkube")
 
 
-def get_stale_profiles(pmr: ProfilesManagementRepresentation) -> dict[str, GenericGlobalResource]:
+def list_stale_profiles(pmr: ProfilesManagementRepresentation) -> dict[str, GenericGlobalResource]:
     """Find all profiles that exist in the cluster but do not belong in a given PMR.
 
     Args:
