@@ -13,10 +13,9 @@ import logging
 from typing import Dict
 
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
-from lightkube import Client
 from lightkube.generic_resource import GenericGlobalResource
 
-from profiles_management.helpers.k8s import get_name
+from profiles_management.helpers.k8s import client, get_name
 from profiles_management.helpers.kfam import (
     list_contributor_authorization_policies,
     list_contributor_rolebindings,
@@ -25,7 +24,6 @@ from profiles_management.helpers.profiles import list_profiles
 from profiles_management.pmr.classes import ProfilesManagementRepresentation
 
 log = logging.getLogger(__name__)
-client = Client(field_manager="profiles-automator-lightkube")
 
 
 def remove_access_to_stale_profile(profile: GenericGlobalResource):

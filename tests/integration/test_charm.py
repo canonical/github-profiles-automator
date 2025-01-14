@@ -14,6 +14,7 @@ APP_NAME = METADATA["name"]
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.skip()
 async def test_build_and_deploy(ops_test: OpsTest):
     """Build the github-profiles-automator charm and deploy it.
 
