@@ -142,3 +142,6 @@ def test_no_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCh
     # Assert
     harness.charm._get_pmr_from_yaml()
     assert isinstance(harness.charm.model.unit.status, BlockedStatus)
+    assert (
+        "Could not load YAML file at path" in harness.charm.model.unit.status.message
+    )

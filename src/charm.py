@@ -161,12 +161,12 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 pmr.add_profile(Profile.model_validate(profile_dict))
             return pmr
         except ops.pebble.PathError:
-            logger.warning("Could not load YAML file.")
-            raise ErrorWithStatus(
-                f"Could not load YAML file at path {str(self.config["pmr-yaml-path"])}. "
+            logger.warning("Could not load YAML file at path: {str(self.config['pmr-yaml-path'])}")
+            self.unit.status = ops.BlockedStatus(
+                f"Could not load YAML file at path {str(self.config['pmr-yaml-path'])}."
                 "You may need to configure `pmr-yaml-path`.",
-                ops.BlockedStatus,
             )
+            return
 
     @property
     def ssh_key(self) -> str | None:
