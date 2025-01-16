@@ -1,7 +1,10 @@
 # Copyright 2024 Ubuntu
 # See LICENSE file for licensing details.
 
+from pathlib import Path
+import os
 from unittest.mock import MagicMock
+import yaml
 
 import ops
 import ops.testing
@@ -103,3 +106,39 @@ def test_ssh_key_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]
     # Assert
     root = harness.get_filesystem_root("git-sync")
     assert (root / "etc/git-secret/ssh").exists()
+
+    
+def test_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
+    """Test that _get_pmr_from_yaml() correctly returns a non-empty PMR object."""
+    # Arrange
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin_with_initial_hooks()
+    
+    # Mock
+    harness.charm.container = MagicMock()
+    harness.charm.container.pull.return_value = """profiles:
+- name: ml-engineers
+  owner:
+    kind: user
+    name: admin@canonical.com
+  contributors:
+  - name: kimonas@canonical.com
+    role: admin
+"""
+    # Assert
+    pmr = harness.charm._get_pmr_from_yaml()
+    assert pmr is not None
+
+def test_no_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
+    """Test that _get_pmr_from_yaml() raises the appropriate error with Blocked status."""
+    # Arrange
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin_with_initial_hooks()
+    
+    # Mock
+    harness.charm.container = MagicMock()
+    harness.charm.container.pull.side_effect = ops.pebble.PathError("not-found", "The path does not exist")
+    
+    # Assert
+    pmr = harness.charm._get_pmr_from_yaml()
+    assert isinstance(harness.charm.model.unit.status, BlockedStatus)

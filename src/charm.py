@@ -11,6 +11,7 @@ a Profiles Representation (PMR) that is hosted as a file in a GitHub repo.
 import logging
 
 import ops
+import yaml
 from charmed_kubeflow_chisme.components import ContainerFileTemplate, LazyContainerFileTemplate
 from charmed_kubeflow_chisme.components.charm_reconciler import CharmReconciler
 from charmed_kubeflow_chisme.components.leadership_gate_component import LeadershipGateComponent
@@ -21,7 +22,12 @@ from components.pebble_component import (
     GitSyncPebbleService,
     RepositoryType,
 )
+from profiles_management.create_or_update import create_or_update_profiles
+from profiles_management.delete_stale import delete_stale_profiles
+from profiles_management.list_stale import list_stale_profiles
+from profiles_management.pmr.classes import Profile, ProfilesManagementRepresentation
 
+CLONED_REPO_PATH = "/git/cloned-repo/"
 SSH_KEY_DESTINATION_PATH = "/etc/git-secret/ssh"
 SSH_KEY_PERMISSIONS = 0o400
 EXECHOOK_SCRIPT_DESTINATION_PATH = "/git-sync-exechook.sh"
@@ -85,6 +91,83 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
 
         self.charm_reconciler.install_default_event_handlers()
 
+        # Sync when receiving a Pebble custom notice
+        self.framework.observe(
+            self.on[self.pebble_service_name].pebble_custom_notice, self._on_pebble_custom_notice
+        )
+
+        # Handlers for all Juju actions
+        self.framework.observe(self.on.sync_now_action, self._on_sync_now)
+        self.framework.observe(self.on.list_stale_profiles_action, self._on_list_stale_profiles)
+        self.framework.observe(
+            self.on.delete_stale_profiles_action, self._on_delete_stale_profiles
+        )
+
+    def _on_sync_now(self, event: ops.ActionEvent):
+        """Log the Juju action and call sync_now()."""
+        logger.info("Juju action sync-now has been triggered.")
+        event.log("Running sync-now...")
+        self._sync_profiles()
+        event.log("Profiles have been synced")
+
+    def _on_list_stale_profiles(self, event: ops.ActionEvent):
+        """List the stale Profiles on the cluster."""
+        logger.info("Juju action list-stale-profiles has been triggered.")
+        event.log("Running list-stale-profiles...")
+        pmr = self._get_pmr_from_yaml()
+        if pmr:
+            stale_profiles = list_stale_profiles(pmr)
+            stale_profiles_string = ", ".join(stale_profiles.keys())
+            event.set_results({"stale-profiles": stale_profiles_string})
+
+    def _on_delete_stale_profiles(self, event: ops.ActionEvent):
+        """Delete all stale Profiles on the cluster."""
+        logger.info("Juju action delete-stale-profiles has been triggered.")
+        event.log("Running delete-stale-profiles...")
+        pmr = self._get_pmr_from_yaml()
+        if pmr:
+            delete_stale_profiles(pmr)
+        event.log("Stale Profiles have been deleted.")
+
+    def _on_pebble_custom_notice(self, event: ops.PebbleNoticeEvent):
+        """Call sync_now if the custom notice has the specified notice key."""
+        if event.notice.key == "github-profiles-automator.com/sync":
+            logger.info(f"Custom notice {event.notice.key} received, syncing profiles.")
+            self._sync_profiles()
+        else:
+            logger.info(f"Custom notice {event.notice.key} ignored.")
+
+    def _sync_profiles(self):
+        """Sync the Kubeflow Profiles based on the YAML file at `pmr-yaml-path`."""
+        pmr = self._get_pmr_from_yaml()
+        if pmr:
+            create_or_update_profiles(pmr)
+
+    def _get_pmr_from_yaml(self) -> ProfilesManagementRepresentation | None:
+        """Return the PMR based on the YAML file in `repository` under `pmr-yaml-path`.
+
+        Returns:
+            The PMR, or None if the YAML file cannot be loaded
+
+        Raises:
+            ErrorWithStatus: If the YAML at pmr-yaml-path could not be loaded
+        """
+        yaml_file_path = CLONED_REPO_PATH + str(self.config["pmr-yaml-path"])
+        try:
+            yaml_file = self.container.pull(yaml_file_path)
+            loaded_yaml = yaml.safe_load(yaml_file)
+            pmr = ProfilesManagementRepresentation()
+            for profile_dict in loaded_yaml["profiles"]:
+                pmr.add_profile(Profile.model_validate(profile_dict))
+            return pmr
+        except ops.pebble.PathError:
+            logger.warning("Could not load YAML file.")
+            raise ErrorWithStatus(
+                f"Could not load YAML file at path {str(self.config["pmr-yaml-path"])}. "
+                "You may need to configure `pmr-yaml-path`.",
+                ops.BlockedStatus,
+            )
+
     @property
     def ssh_key(self) -> str | None:
         """Retrieve the SSH key value from the Juju secrets, using the ssh-key-secret-id config.
@@ -105,7 +188,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             ssh_key += "\n\n"
             return ssh_key
         except (ops.SecretNotFoundError, ops.model.ModelError):
-            logger.warning("The SSH key does not exist")
+            logger.warning("An SSH URL has been set but an SSH key has not been provided.")
             return None
 
     def _validate_repository_config(self):
@@ -116,7 +199,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             there is a missing SSH key when needed.
         """
         if self.config["repository"] == "":
-            logger.warning("Charm is Blocked due to empty value of `repository`")
+            logger.warning("Charm is Blocked due to empty value of `repository`.")
             raise ErrorWithStatus("Config `repository` cannot be empty.", ops.BlockedStatus)
 
         if is_ssh_url(str(self.config["repository"])):
