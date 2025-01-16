@@ -16,6 +16,7 @@ from charmed_kubeflow_chisme.components import ContainerFileTemplate, LazyContai
 from charmed_kubeflow_chisme.components.charm_reconciler import CharmReconciler
 from charmed_kubeflow_chisme.components.leadership_gate_component import LeadershipGateComponent
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
+from lightkube import Client
 
 from components.pebble_component import (
     GitSyncInputs,
@@ -44,6 +45,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         super().__init__(framework)
         self.pebble_service_name = "git-sync"
         self.container = self.unit.get_container("git-sync")
+
+        # Lightkube client needed for the Profile management functions
+        self.client = Client(field_manager="profiles-automator-lightkube")
 
         self.files_to_push = []
 
@@ -116,7 +120,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         event.log("Running list-stale-profiles...")
         pmr = self._get_pmr_from_yaml()
         if pmr:
-            stale_profiles = list_stale_profiles(pmr)
+            stale_profiles = list_stale_profiles(self.client, pmr)
             stale_profiles_string = ", ".join(stale_profiles.keys())
             event.set_results({"stale-profiles": stale_profiles_string})
 
@@ -126,7 +130,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         event.log("Running delete-stale-profiles...")
         pmr = self._get_pmr_from_yaml()
         if pmr:
-            delete_stale_profiles(pmr)
+            delete_stale_profiles(self.client, pmr)
         event.log("Stale Profiles have been deleted.")
 
     def _on_pebble_custom_notice(self, event: ops.PebbleNoticeEvent):
@@ -141,7 +145,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         """Sync the Kubeflow Profiles based on the YAML file at `pmr-yaml-path`."""
         pmr = self._get_pmr_from_yaml()
         if pmr:
-            create_or_update_profiles(pmr)
+            create_or_update_profiles(self.client, pmr)
 
     def _get_pmr_from_yaml(self) -> ProfilesManagementRepresentation | None:
         """Return the PMR based on the YAML file in `repository` under `pmr-yaml-path`.
