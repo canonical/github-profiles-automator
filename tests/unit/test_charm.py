@@ -1,7 +1,7 @@
 # Copyright 2024 Ubuntu
 # See LICENSE file for licensing details.
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import ops
 import ops.testing
@@ -16,7 +16,6 @@ def harness():
     harness = ops.testing.Harness(GithubProfilesAutomatorCharm)
     yield harness
     harness.cleanup()
-
 
 def test_empty_repository(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
     """Test that setting an empty string for the repository sets the status to Blocked."""
