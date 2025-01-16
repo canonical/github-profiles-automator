@@ -39,7 +39,7 @@ async def test_list_stale_profiles(deploy_profiles_controller, lightkube_client:
     pmr = classes.ProfilesManagementRepresentation()
 
     log.info("Running list_stale_profiles() which should return all Profiles we created earlier.")
-    stale_profiles = list_stale_profiles(pmr)
+    stale_profiles = list_stale_profiles(lightkube_client, pmr)
 
     assert existing_profiles == stale_profiles
 

@@ -39,7 +39,7 @@ async def test_remove_access_to_stale_profiles(
     pmr = classes.ProfilesManagementRepresentation()
 
     log.info("Running create_or_update_profiles() which should remove access in above Profile.")
-    create_or_update_profiles(pmr)
+    create_or_update_profiles(lightkube_client, pmr)
 
     rbs = kfam.list_contributor_rolebindings(lightkube_client, ns)
     assert len(rbs) == 0

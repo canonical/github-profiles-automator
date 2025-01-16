@@ -13,9 +13,10 @@ import logging
 from typing import Dict
 
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
+from lightkube import Client
 from lightkube.generic_resource import GenericGlobalResource
 
-from profiles_management.helpers.k8s import client, get_name
+from profiles_management.helpers.k8s import get_name
 from profiles_management.helpers.kfam import (
     list_contributor_authorization_policies,
     list_contributor_rolebindings,
@@ -26,7 +27,7 @@ from profiles_management.pmr.classes import ProfilesManagementRepresentation
 log = logging.getLogger(__name__)
 
 
-def remove_access_to_stale_profile(profile: GenericGlobalResource):
+def remove_access_to_stale_profile(client: Client, profile: GenericGlobalResource):
     """Remove access to all users from a Profile.
 
     This is achieved by removing all KFAM RoleBindings and
@@ -34,6 +35,7 @@ def remove_access_to_stale_profile(profile: GenericGlobalResource):
     for the Profile owner will not be touched.
 
     Args:
+        client: The lightkube client to use.
         profile: The lightkube Profile object from which all contributors should be removed.
     """
     profile_namespace = get_name(profile)
@@ -49,7 +51,7 @@ def remove_access_to_stale_profile(profile: GenericGlobalResource):
     log.info("Deleted all KFAM AuthorizationPolicies")
 
 
-def create_or_update_profiles(pmr: ProfilesManagementRepresentation):
+def create_or_update_profiles(client: Client, pmr: ProfilesManagementRepresentation):
     """Update the cluster to ensure Profiles and contributors are updated accordingly.
 
     The function ensures that:
@@ -64,6 +66,7 @@ def create_or_update_profiles(pmr: ProfilesManagementRepresentation):
           Profile, so that no user will have further access to it
 
     Args:
+        client: The lightkube client to use.
         pmr: The ProfilesManagementRepresentation expressing what Profiles and contributors
              should exist in the cluster.
     """
@@ -77,4 +80,4 @@ def create_or_update_profiles(pmr: ProfilesManagementRepresentation):
     for profile_name, existing_profile in existing_profiles.items():
         if not pmr.has_profile(profile_name):
             logging.info("Profile %s not in PMR. Will remove access.", profile_name)
-            remove_access_to_stale_profile(existing_profile)
+            remove_access_to_stale_profile(client, existing_profile)
