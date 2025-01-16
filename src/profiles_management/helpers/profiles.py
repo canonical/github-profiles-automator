@@ -15,7 +15,7 @@ from profiles_management.helpers import k8s
 from profiles_management.helpers.k8s import ensure_namespace_exists
 from profiles_management.pmr import classes
 
-Profile = create_global_resource(
+ProfileLightkube = create_global_resource(
     group="kubeflow.org", version="v1", kind="Profile", plural="profiles"
 )
 
@@ -31,7 +31,7 @@ def list_profiles(client: Client) -> Iterator[GenericGlobalResource]:
     Returns:
         Iterator of Profiles in the cluster.
     """
-    return client.list(Profile)
+    return client.list(ProfileLightkube)
 
 
 def remove_profile(profile: GenericGlobalResource, client: Client, wait_namespace=True):
@@ -49,7 +49,7 @@ def remove_profile(profile: GenericGlobalResource, client: Client, wait_namespac
     """
     nm = k8s.get_name(profile)
     log.info("Removing Profile: %s", nm)
-    client.delete(Profile, nm)
+    client.delete(ProfileLightkube, nm)
 
     if wait_namespace:
         log.info("Waiting for created namespace to be deleted.")
@@ -71,7 +71,7 @@ def lightkube_profile_from_pmr_profile(profile: classes.Profile) -> GenericGloba
         else profile.resources.model_dump(by_alias=True, exclude_none=True)
     )
 
-    return Profile.from_dict(
+    return ProfileLightkube.from_dict(
         {
             "metadata": {
                 "name": profile.name,
@@ -144,5 +144,5 @@ def update_resource_quota(
     quota_spec = pmr_profile.resources.model_dump() if pmr_profile.resources is not None else {}
     patch = {"spec": {"resourceQuotaSpec": quota_spec}}
 
-    client.patch(Profile, name=pmr_profile.name, obj=patch, patch_type=PatchType.MERGE)
+    client.patch(ProfileLightkube, name=pmr_profile.name, obj=patch, patch_type=PatchType.MERGE)
     log.info("Successfully patched resourceQuotaSpec of Profile: %s", pmr_profile.name)

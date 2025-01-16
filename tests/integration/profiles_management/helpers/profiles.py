@@ -14,7 +14,7 @@ from tests.integration.profiles_management.helpers import k8s
 
 log = logging.getLogger(__name__)
 
-Profile = create_global_resource(
+ProfileLightkube = create_global_resource(
     group="kubeflow.org", version="v1", kind="Profile", plural="profiles"
 )
 
@@ -32,7 +32,7 @@ def get_profile(client: Client, name: str) -> GenericGlobalResource:
     Returns:
         The Profile lightkube object from the cluster.
     """
-    return client.get(Profile, name=name)
+    return client.get(ProfileLightkube, name=name)
 
 
 def load_profile_from_file(file_path: str, context: dict = {}) -> codecs.AnyResource:
@@ -100,7 +100,7 @@ def remove_profile(profile: GenericGlobalResource, client: Client, wait_namespac
     """
     nm = k8s.get_name(profile)
     log.info("Removing Profile: %s", nm)
-    client.delete(Profile, nm)
+    client.delete(ProfileLightkube, nm)
 
     if wait_namespace:
         log.info("Waiting for created namespace to be deleted.")
