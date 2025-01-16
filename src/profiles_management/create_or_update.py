@@ -76,6 +76,7 @@ def create_or_update_profiles(client: Client, pmr: ProfilesManagementRepresentat
     for profile in profiles.list_profiles(client):
         existing_profiles[get_name(profile)] = profile
 
+    # Remove access to all stale Profiles
     log.info("Removing access to all stale Profiles.")
     for profile_name, existing_profile in existing_profiles.items():
         if not pmr.has_profile(profile_name):
