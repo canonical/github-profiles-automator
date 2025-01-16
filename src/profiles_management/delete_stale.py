@@ -25,5 +25,6 @@ def delete_stale_profiles(client: Client, pmr: ProfilesManagementRepresentation)
     """
     stale_profiles = list_stale_profiles(client, pmr)
     log.info("Deleting all stale Profiles.")
-    for existing_profile in stale_profiles.values():
+    for existing_profile_name, existing_profile in stale_profiles.items():
+        log.info(f"Deleting stale Profile: {existing_profile_name}")
         profiles.remove_profile(existing_profile, client)

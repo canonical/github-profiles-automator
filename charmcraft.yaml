@@ -62,6 +62,17 @@ resources:
     description: OCI image for the 'git-sync' container
     upstream-source: registry.k8s.io/git-sync/git-sync:v4.4.0
 
+actions:
+  sync-now:
+    description: |
+      Sync the Kubeflow Profiles on the cluster based on the PMR in `pmr-yaml-path`.
+  list-stale-profiles:
+    description: |
+      Return a list of Profiles that exist on the cluster but not on the PMR in `pmr-yaml-path`.
+  delete-stale-profiles:
+    description: |
+      Delete all Profiles that exist on the cluster but not on the PMR in `pmr-yaml-path`.
+
 storage:
   content-from-git:
     type: filesystem
