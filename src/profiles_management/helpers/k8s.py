@@ -9,7 +9,6 @@ from lightkube.generic_resource import GenericGlobalResource, GenericNamespacedR
 from lightkube.resources.core_v1 import Namespace
 
 log = logging.getLogger(__name__)
-client = Client(field_manager="profiles-automator-lightkube")
 
 
 # For errors when a Namespace exists while it shouldn't

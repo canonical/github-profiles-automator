@@ -35,7 +35,7 @@ async def test_delete_stale_profiles(deploy_profiles_controller, lightkube_clien
     log.info(
         "Running delete_stale_profiles() which should delete all Profiles we created earlier."
     )
-    delete_stale_profiles(pmr)
+    delete_stale_profiles(lightkube_client, pmr)
 
     # Check that the iterator returns no elements
     assert all(False for _ in list_profiles(client))
