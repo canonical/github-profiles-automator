@@ -70,7 +70,7 @@ def ensure_namespace_is_deleted(namespace: str, client: Client):
 
 @tenacity.retry(stop=tenacity.stop_after_delay(60), wait=tenacity.wait_fixed(2), reraise=True)
 def ensure_namespace_exists(ns: str, client: Client):
-    """Check if the name exists with retries.
+    """Check if the namespace exists with retries.
 
     The retries will catch the 404 errors if the namespace doesn't exist.
 
