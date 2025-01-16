@@ -88,7 +88,7 @@ async def test_new_profiles_created(lightkube_client: Client):
 @pytest.mark.asyncio
 async def test_update_resource_quota(lightkube_client: Client):
     profile_path = TESTS_YAMLS_PATH + "/profile.yaml"
-    log.info("Loading test YAMLs from: %s",  profile_path)
+    log.info("Loading test YAMLs from: %s", profile_path)
 
     ns = "test"
     context = {"namespace": ns}
