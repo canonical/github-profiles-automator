@@ -128,7 +128,7 @@ def test_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm
 
 
 def test_no_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
-    """Test that _get_pmr_from_yaml() raises the appropriate error with Blocked status."""
+    """Test that _get_pmr_from_yaml() blocks if there is no file at `pmr-yaml-path."""
     # Arrange
     harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
     harness.begin_with_initial_hooks()
@@ -143,3 +143,32 @@ def test_no_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCh
     harness.charm._get_pmr_from_yaml()
     assert isinstance(harness.charm.model.unit.status, BlockedStatus)
     assert "Could not load YAML file at path" in harness.charm.model.unit.status.message
+
+
+def test_wrong_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
+    """Test that _get_pmr_from_yaml() blocks if it cannot create a Profile from the YAML file."""
+    # Arrange
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin_with_initial_hooks()
+
+    # Check an invalid YAML file
+    # Mock
+    harness.charm.container = MagicMock()
+    harness.charm.container.pull.return_value = """This is an incorrect PMR file."""
+
+    # Assert
+    harness.charm._get_pmr_from_yaml()
+    assert isinstance(harness.charm.model.unit.status, BlockedStatus)
+    assert "Could not create Profiles" in harness.charm.model.unit.status.message
+
+    # Check a YAML file with wrong keys
+    # Mock
+    harness.charm.container = MagicMock()
+    harness.charm.container.pull.return_value = """profiles:
+- name: ml-engineers
+  wrong-key: wrong-value
+"""
+    # Assert
+    harness.charm._get_pmr_from_yaml()
+    assert isinstance(harness.charm.model.unit.status, BlockedStatus)
+    assert "Could not create Profiles" in harness.charm.model.unit.status.message

@@ -17,6 +17,7 @@ from charmed_kubeflow_chisme.components.charm_reconciler import CharmReconciler
 from charmed_kubeflow_chisme.components.leadership_gate_component import LeadershipGateComponent
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from lightkube import Client
+from pydantic import ValidationError
 
 from components.pebble_component import (
     GitSyncInputs,
@@ -169,6 +170,22 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             self.unit.status = ops.BlockedStatus(
                 f"Could not load YAML file at path {str(self.config['pmr-yaml-path'])}."
                 "You may need to configure `pmr-yaml-path`.",
+            )
+            return
+        except TypeError as e:
+            logger.warning(f"TypeError while creating a Profile from a dictionary: {str(e)}")
+            self.unit.status = ops.BlockedStatus(
+                f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}."
+                "You may need to check the file at `pmr-yaml-path`.",
+            )
+            return
+        except ValidationError as e:
+            logger.warning(
+                f"ValidationError while creating a Profile from a dictionary: {e.errors()}"
+            )
+            self.unit.status = ops.BlockedStatus(
+                f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}."
+                "You may need to check the file at `pmr-yaml-path`.",
             )
             return
 
