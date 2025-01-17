@@ -6,17 +6,21 @@ from lightkube import Client
 from profiles_management.create_or_update import create_or_update_profiles
 from profiles_management.pmr import classes
 from profiles_management.pmr.classes import (
+    Contributor,
+    ContributorRole,
     Owner,
     Profile,
     ProfilesManagementRepresentation,
     ResourceQuotaSpecModel,
     UserKind,
 )
-from tests.integration.profiles_management.helpers import k8s, kfam, profiles
+from tests.integration.profiles_management.helpers import kfam, profiles
 
 log = logging.getLogger(__name__)
 
 TESTS_YAMLS_PATH = "tests/integration/profiles_management/yamls"
+PROFILE_PATH = TESTS_YAMLS_PATH + "/profile.yaml"
+RESOURCES_PATH = TESTS_YAMLS_PATH + "/contributor.yaml"
 
 
 @pytest.mark.asyncio
@@ -26,21 +30,9 @@ async def test_remove_access_to_stale_profiles(
     await deploy_profiles_controller
 
     ns = "test"
-    context = {"namespace": ns}
-
-    profile_path = TESTS_YAMLS_PATH + "/profile.yaml"
-    contributor_path = TESTS_YAMLS_PATH + "/contributor.yaml"
-
-    # Load and apply all objects from files
-    profile_contents = profiles.load_profile_from_file(profile_path, context)
-    resources = k8s.load_namespaced_objects_from_file(contributor_path, context)
-
-    log.info("Creating Profile and waiting for Namespace to be created...")
-    profile = profiles.apply_profile(profile_contents, lightkube_client)
-
-    log.info("Applying all namespaced contributor resources.")
-    for resource in resources:
-        lightkube_client.apply(resource)
+    profile = profiles.apply_profile_and_resources(
+        lightkube_client, profile_path=PROFILE_PATH, resources_path=RESOURCES_PATH, namespace=ns
+    )
 
     # Create the PMR, which should not contain the above test profile
     pmr = classes.ProfilesManagementRepresentation()
@@ -91,13 +83,11 @@ async def test_update_resource_quota(lightkube_client: Client):
     log.info("Loading test YAMLs from: %s", profile_path)
 
     ns = "test"
-    context = {"namespace": ns}
-    profile_contents = profiles.load_profile_from_file(profile_path, context)
+    profile = profiles.apply_profile_and_resources(
+        lightkube_client, profile_path=PROFILE_PATH, namespace=ns
+    )
 
-    log.info("Creating Profile and waiting for Namespace to be created...")
-    profile = profiles.apply_profile(profile_contents, lightkube_client, wait_namespace=True)
     log.info("Created Profile has quota: %s", profile["spec"]["resourceQuotaSpec"])
-
     expected_quota = ResourceQuotaSpecModel.model_validate({"hard": {"cpu": "1"}})
     pmr_profile = Profile(
         name=ns,
@@ -121,3 +111,85 @@ async def test_update_resource_quota(lightkube_client: Client):
 
     log.info("Removing test Profile and resources in it")
     profiles.remove_profile(profile, lightkube_client, wait_namespace=True)
+
+
+def test_surplus_rolebindings_are_deleted(lightkube_client: Client):
+    ns = "test-surplus-rolebindings-are-deleted"
+    profile = profiles.apply_profile_and_resources(
+        lightkube_client, profile_path=PROFILE_PATH, resources_path=RESOURCES_PATH, namespace=ns
+    )
+
+    pmr_profile = Profile(
+        name=ns,
+        owner=Owner(name=ns, kind=UserKind.USER),
+        contributors=[],
+        resources={},
+    )
+
+    log.info("Deleting superfluous RoleBindings from ")
+    create_or_update_profiles(lightkube_client, ProfilesManagementRepresentation([pmr_profile]))
+
+    rbs = kfam.list_contributor_rolebindings(lightkube_client, ns)
+    assert len(rbs) == 0
+
+    profiles.remove_profile(profile, lightkube_client)
+
+
+def test_existing_rolebindings_are_updated(lightkube_client: Client):
+    """Existing RoleBinding for "permissions" should be updated to "admin"."""
+    ns = "test-existing-rolebindings-updated"
+    profile = profiles.apply_profile_and_resources(
+        lightkube_client, profile_path=PROFILE_PATH, resources_path=RESOURCES_PATH, namespace=ns
+    )
+
+    user = "kimonas@canonical.com"
+    role = ContributorRole.ADMIN
+    pmr_profile = Profile(
+        name=ns,
+        owner=Owner(name=ns, kind=UserKind.USER),
+        contributors=[Contributor(name=user, role=role)],
+        resources={},
+    )
+
+    log.info("Updating existing RoleBindings from edit to be admin.")
+    create_or_update_profiles(lightkube_client, ProfilesManagementRepresentation([pmr_profile]))
+
+    rbs = kfam.list_contributor_rolebindings(lightkube_client, ns)
+    assert len(rbs) == 1
+
+    assert rbs[0].metadata is not None
+    assert rbs[0].metadata.annotations is not None
+    assert rbs[0].metadata.annotations["user"] == user
+    assert rbs[0].metadata.annotations["role"] == role
+
+    profiles.remove_profile(profile, lightkube_client)
+
+
+def test_rolebindings_are_created(lightkube_client: Client):
+    """Existing RoleBinding for "permissions" should be updated to "admin"."""
+    ns = "test-rolebindings-created"
+    profile = profiles.apply_profile_and_resources(
+        lightkube_client, profile_path=PROFILE_PATH, namespace=ns
+    )
+
+    user = "kimonas@canonical.com"
+    role = ContributorRole.ADMIN
+    pmr_profile = Profile(
+        name=ns,
+        owner=Owner(name=ns, kind=UserKind.USER),
+        contributors=[Contributor(name=user, role=role)],
+        resources={},
+    )
+
+    log.info("Creating RoleBinding for admin role.")
+    create_or_update_profiles(lightkube_client, ProfilesManagementRepresentation([pmr_profile]))
+
+    rbs = kfam.list_contributor_rolebindings(lightkube_client, ns)
+    assert len(rbs) == 1
+
+    assert rbs[0].metadata is not None
+    assert rbs[0].metadata.annotations is not None
+    assert rbs[0].metadata.annotations["user"] == user
+    assert rbs[0].metadata.annotations["role"] == role
+
+    profiles.remove_profile(profile, lightkube_client)
