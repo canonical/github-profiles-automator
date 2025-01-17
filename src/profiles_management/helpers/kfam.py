@@ -7,6 +7,9 @@ from lightkube import Client
 from lightkube.generic_resource import GenericNamespacedResource, create_namespaced_resource
 from lightkube.resources.rbac_authorization_v1 import RoleBinding
 
+from profiles_management.helpers import k8s
+from profiles_management.pmr import classes
+
 log = logging.getLogger(__name__)
 
 AuthorizationPolicy = create_namespaced_resource(
@@ -20,16 +23,26 @@ AuthorizationPolicy = create_namespaced_resource(
 def has_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> bool:
     """Check if resource has "user" and "role" KFAM annotations.
 
+    The function will also ensure the the value for "role", in the annotations" will have
+    one of the expected values: admin, edit, view
+
     Args:
         resource: The RoleBinding or AuthorizationPolicy to check if it has KFAM annotations.
 
     Returns:
         A boolean if the provided resources has a `role` and `user` annotation.
     """
-    if resource.metadata and resource.metadata.annotations:
-        return "role" in resource.metadata.annotations and "user" in resource.metadata.annotations
+    annotations = k8s.get_annotations(resource)
+    if "user" not in annotations or "role" not in annotations:
+        return False
 
-    return False
+    try:
+        classes.ContributorRole(annotations["role"])
+    except ValueError:
+        # String in annotation doesn't match expected KFAM role
+        return False
+
+    return True
 
 
 def resource_is_for_profile_owner(resource: GenericNamespacedResource | RoleBinding) -> bool:
@@ -48,6 +61,85 @@ def resource_is_for_profile_owner(resource: GenericNamespacedResource | RoleBind
         )
 
     return False
+
+
+def get_contributor_user(resource: GenericNamespacedResource | RoleBinding) -> str:
+    """Return user in KFAM annotation.
+
+    Raises:
+        ValueError: If the object does not have KFAM annotations.
+
+    Returns:
+        The user defined in metadata.annotations.user of the resource.
+    """
+    if not has_kfam_annotations(resource):
+        raise ValueError("Resource doesn't have KFAM metadata: %s" % k8s.get_name(resource))
+
+    annotations = k8s.get_annotations(resource)
+    return annotations["user"]
+
+
+def get_contributor_role(
+    resource: GenericNamespacedResource | RoleBinding,
+) -> classes.ContributorRole:
+    """Return role in KFAM annotation.
+
+    Raises:
+        ValueError: If the object does not have valid KFAM annotations.
+
+    Returns:
+        The user defined in metadata.annotations.user of the resource.
+    """
+    if not has_kfam_annotations(resource):
+        raise ValueError("Resource doesn't have KFAM metadata: %s" % k8s.get_name(resource))
+
+    annotations = k8s.get_annotations(resource)
+    return classes.ContributorRole(annotations["role"])
+
+
+def rolebinding_matches_profile_contributor(rb: RoleBinding, profile: classes.Profile) -> bool:
+    """Check if the user and it's role in the RoleBinding match the PMR."""
+    if profile.contributors is None:
+        return False
+
+    if not has_kfam_annotations(rb):
+        return False
+
+    role = get_contributor_role(rb)
+    user = get_contributor_user(rb)
+    for contributor_role in profile._contributors_dict.get(user, []):
+        if contributor_role == role:
+            return True
+
+    return False
+
+
+def generate_contributor_rolebinding(
+    contributor: classes.Contributor, namespace: str
+) -> RoleBinding:
+    """Generate RoleBinding for a PMR Contributor."""
+    name_rfc1123 = k8s.to_rfc1123_compliant(f"{contributor.name}-{contributor.role}")
+
+    return RoleBinding.from_dict(
+        {
+            "metadata": {
+                "name": name_rfc1123,
+                "namespace": namespace,
+                "annotations": {
+                    "user": contributor.name,
+                    "role": contributor.role,
+                },
+            },
+            "roleRef": {
+                "apiGroup": "rbac.authorization.k8s.io",
+                "kind": "ClusterRole",
+                "name": f"kubeflow-{contributor.role}",
+            },
+            "subjects": [
+                {"apiGroup": "rbac.authorization.k8s.io", "kind": "User", "name": contributor.name}
+            ],
+        },
+    )
 
 
 def list_contributor_rolebindings(client: Client, namespace="") -> List[RoleBinding]:

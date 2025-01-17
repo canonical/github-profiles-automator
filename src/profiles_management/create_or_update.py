@@ -10,19 +10,24 @@ based on a PMR.
 """
 
 import logging
-from typing import Dict
+from typing import Dict, List
 
-from charmed_kubeflow_chisme.lightkube.batch import delete_many
+from charmed_kubeflow_chisme.lightkube.batch import apply_many, delete_many
 from lightkube import Client
 from lightkube.generic_resource import GenericGlobalResource
+from lightkube.resources.rbac_authorization_v1 import RoleBinding
 
-from profiles_management.helpers import profiles
+from profiles_management.helpers import k8s, kfam, profiles
 from profiles_management.helpers.k8s import get_name
 from profiles_management.helpers.kfam import (
     list_contributor_authorization_policies,
     list_contributor_rolebindings,
 )
-from profiles_management.pmr.classes import ProfilesManagementRepresentation
+from profiles_management.pmr.classes import (
+    ContributorRole,
+    Profile,
+    ProfilesManagementRepresentation,
+)
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +54,45 @@ def remove_access_to_stale_profile(client: Client, profile: GenericGlobalResourc
     existing_aps = list_contributor_authorization_policies(client)
     delete_many(client, existing_aps, logger=log)
     log.info("Deleted all KFAM AuthorizationPolicies")
+
+
+def update_profile_rolebindings(client: Client, profile: Profile):
+    """Update Profiles in namespace to match what's defined in the PMR."""
+    rbs = list_contributor_rolebindings(client, profile.name)
+    rbs_to_delete: List[RoleBinding] = []
+    existing_contributor_roles: dict[str, List[ContributorRole]] = {}
+
+    for rb in rbs:
+        if kfam.rolebinding_matches_profile_contributor(rb, profile):
+            # Group the existing roles, based on user for efficient checks on which RBs to create
+            log.info("RoleBinding '%s' belongs to PMR Profile: %s", k8s.get_name(rb), profile.name)
+            user = kfam.get_contributor_user(rb)
+            role = kfam.get_contributor_role(rb)
+            existing_contributor_roles[user] = existing_contributor_roles.get(user, []) + [role]
+        else:
+            # Gather which RoleBindings should be deleted
+            log.info(
+                "RoleBinding '%s' doesn't belong to Profile. Will delete it.",
+                k8s.get_name(rb),
+            )
+            rbs_to_delete.append(rb)
+
+    log.info("Deleting all RoleBindings that don't match the PMR.")
+    delete_many(client, rbs_to_delete, logger=log)
+
+    # Create RoleBinding, if it doesn't already exist
+    if profile.contributors is None:
+        log.info("No contributors defined in Profile '%s'. Won't create RoleBindings.")
+        return
+
+    rbs_to_create = []
+    for contributor in profile.contributors:
+        if contributor.role not in existing_contributor_roles.get(contributor.name, []):
+            log.info("Will create RoleBinding for Contributor: %s", contributor)
+            rbs_to_create.append(kfam.generate_contributor_rolebinding(contributor, profile.name))
+
+    log.info("Creating RoleBindings, that don't already exist, for Profile Contributors.")
+    apply_many(client=client, objs=rbs_to_create, logger=log)
 
 
 def create_or_update_profiles(client: Client, pmr: ProfilesManagementRepresentation):
@@ -95,3 +139,6 @@ def create_or_update_profiles(client: Client, pmr: ProfilesManagementRepresentat
 
         log.info("Creating or updating the ResourceQuota for Profile %s", profile_name)
         profiles.update_resource_quota(client, existing_profile, profile)
+
+        log.info("Updating RoleBindings in the Profile to match the PMR.")
+        update_profile_rolebindings(client, profile)
