@@ -105,3 +105,25 @@ def remove_profile(profile: GenericGlobalResource, client: Client, wait_namespac
     if wait_namespace:
         log.info("Waiting for created namespace to be deleted.")
         k8s.ensure_namespace_is_deleted(nm, client)
+
+
+def apply_profile_and_resources(
+    client: Client,
+    profile_path: str,
+    namespace: str,
+    resources_path="",
+) -> GenericGlobalResource:
+    context = {"namespace": namespace}
+
+    # Load and apply all objects from files
+    log.info("Creating Profile and waiting for Namespace to be created...")
+    profile_contents = load_profile_from_file(profile_path, context)
+    profile = apply_profile(profile_contents, client)
+
+    if resources_path:
+        resources = k8s.load_namespaced_objects_from_file(resources_path, context)
+        log.info("Applying all namespaced contributor resources.")
+        for resource in resources:
+            client.apply(resource)
+
+    return profile
