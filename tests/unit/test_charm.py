@@ -18,6 +18,7 @@ def harness():
     harness.cleanup()
 
 
+# @patch("charm.GithubProfilesAutomatorCharm.lightkube_client")
 def test_empty_repository(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
     """Test that setting an empty string for the repository sets the status to Blocked."""
     # Arrange

@@ -48,7 +48,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         self.container = self.unit.get_container("git-sync")
 
         # Lightkube client needed for the Profile management functions
-        self.client = Client(field_manager="profiles-automator-lightkube")
+        self.lightkube_client = None
 
         self.files_to_push = []
 
@@ -123,7 +123,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         if not pmr:
             logger.info("PMR is empty, nothing to do.")
             return
-        stale_profiles = list_stale_profiles(self.client, pmr)
+        stale_profiles = list_stale_profiles(self.lightkube_client, pmr)
         stale_profiles_string = ", ".join(stale_profiles.keys())
         event.set_results({"stale-profiles": stale_profiles_string})
 
@@ -135,7 +135,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         if not pmr:
             logger.info("PMR is empty, nothing to do.")
             return
-        delete_stale_profiles(self.client, pmr)
+        delete_stale_profiles(self.lightkube_client, pmr)
         event.log("Stale Profiles have been deleted.")
 
     def _on_pebble_custom_notice(self, event: ops.PebbleNoticeEvent):
@@ -152,7 +152,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         if not pmr:
             logger.info("PMR is empty, nothing to do.")
             return
-        create_or_update_profiles(self.client, pmr)
+        create_or_update_profiles(self.lightkube_client, pmr)
 
     def _get_pmr_from_yaml(self) -> ProfilesManagementRepresentation | None:
         """Return the PMR based on the YAML file in `repository` under `pmr-yaml-path`.
@@ -194,6 +194,17 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 "You may need to check the file at `pmr-yaml-path`.",
             )
             return
+
+    @property
+    def lightkube_client(self):
+        """The lightkube client to interact with the Kubernetes cluster."""
+        if not self._lightkube_client:
+            self._lightkube_client = Client(field_manager="profiles-automator-lightkube")
+        return self._lightkube_client
+
+    @lightkube_client.setter
+    def lightkube_client(self, value):
+        self._lightkube_client = value
 
     @property
     def ssh_key(self) -> str | None:
