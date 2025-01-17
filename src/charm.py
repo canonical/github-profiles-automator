@@ -120,18 +120,22 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         logger.info("Juju action list-stale-profiles has been triggered.")
         event.log("Running list-stale-profiles...")
         pmr = self._get_pmr_from_yaml()
-        if pmr:
-            stale_profiles = list_stale_profiles(self.client, pmr)
-            stale_profiles_string = ", ".join(stale_profiles.keys())
-            event.set_results({"stale-profiles": stale_profiles_string})
+        if not pmr:
+            logger.info("PMR is empty, nothing to do.")
+            return
+        stale_profiles = list_stale_profiles(self.client, pmr)
+        stale_profiles_string = ", ".join(stale_profiles.keys())
+        event.set_results({"stale-profiles": stale_profiles_string})
 
     def _on_delete_stale_profiles(self, event: ops.ActionEvent):
         """Delete all stale Profiles on the cluster."""
         logger.info("Juju action delete-stale-profiles has been triggered.")
         event.log("Running delete-stale-profiles...")
         pmr = self._get_pmr_from_yaml()
-        if pmr:
-            delete_stale_profiles(self.client, pmr)
+        if not pmr:
+            logger.info("PMR is empty, nothing to do.")
+            return
+        delete_stale_profiles(self.client, pmr)
         event.log("Stale Profiles have been deleted.")
 
     def _on_pebble_custom_notice(self, event: ops.PebbleNoticeEvent):
@@ -145,8 +149,10 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
     def _sync_profiles(self):
         """Sync the Kubeflow Profiles based on the YAML file at `pmr-yaml-path`."""
         pmr = self._get_pmr_from_yaml()
-        if pmr:
-            create_or_update_profiles(self.client, pmr)
+        if not pmr:
+            logger.info("PMR is empty, nothing to do.")
+            return
+        create_or_update_profiles(self.client, pmr)
 
     def _get_pmr_from_yaml(self) -> ProfilesManagementRepresentation | None:
         """Return the PMR based on the YAML file in `repository` under `pmr-yaml-path`.
