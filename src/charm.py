@@ -113,7 +113,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         logger.info("Juju action sync-now has been triggered.")
         event.log("Running sync-now...")
         self._sync_profiles()
-        event.log("Profiles have been synced")
+        event.log("Profiles have been synced.")
 
     def _on_list_stale_profiles(self, event: ops.ActionEvent):
         """List the stale Profiles on the cluster."""
