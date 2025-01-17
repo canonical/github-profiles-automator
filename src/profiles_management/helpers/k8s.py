@@ -7,6 +7,7 @@ from lightkube import Client
 from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import GenericGlobalResource, GenericNamespacedResource
 from lightkube.resources.core_v1 import Namespace
+from lightkube.resources.rbac_authorization_v1 import RoleBinding
 
 log = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ class ObjectStillExistsError(Exception):
     pass
 
 
-def get_name(res: GenericNamespacedResource | GenericGlobalResource) -> str:
+def get_name(res: GenericNamespacedResource | GenericGlobalResource | RoleBinding) -> str:
     """Return the name from generic lightkube resource.
 
     Args:
@@ -37,6 +38,51 @@ def get_name(res: GenericNamespacedResource | GenericGlobalResource) -> str:
         raise ValueError("Couldn't detect name, object has no name field: %s" % res)
 
     return res.metadata.name
+
+
+def get_annotations(res: GenericNamespacedResource | RoleBinding) -> dict[str, str]:
+    """Return annotations of a RoleBinding or AuthorizationPolicy, or an empty dict.
+
+    Args:
+        res: The resource to return its annotations.
+
+    Returns:
+        A dictionary with the annotations, or empty dictionary if no annotations exist.
+    """
+    if res.metadata and res.metadata.annotations:
+        return res.metadata.annotations
+
+    return {}
+
+
+def to_rfc1123_compliant(name: str) -> str:
+    """Transform a given string into an RFC 1123-compliant string.
+
+    The resulting string will:
+    1. Contain at most 63 characters.
+    2. Contain only lowercase alphanumeric characters or '-'.
+
+    Args:
+        name: The input string to transform.
+
+    Returns:
+        The RFC 1123-compliant string.
+    """
+    compliant_str = name.lower()
+    compliant_str = "".join(char if char.isalnum() else "-" for char in compliant_str)
+
+    # remove starting non-alphanum chars
+    i = 0
+    while not compliant_str[i].isalnum():
+        i += 1
+    compliant_str = compliant_str[i:63]
+
+    # remove ending non-alphanum chars
+    j = len(compliant_str)
+    while not compliant_str[j - 1].isalnum():
+        j -= 1
+
+    return compliant_str[:j]
 
 
 @tenacity.retry(stop=tenacity.stop_after_delay(300), wait=tenacity.wait_fixed(5), reraise=True)

@@ -16,7 +16,7 @@ from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from lightkube import Client
 from lightkube.generic_resource import GenericGlobalResource
 
-from profiles_management.helpers import profiles
+from profiles_management.helpers import kfam, profiles
 from profiles_management.helpers.k8s import get_name
 from profiles_management.helpers.kfam import (
     list_contributor_authorization_policies,
@@ -51,7 +51,10 @@ def remove_access_to_stale_profile(client: Client, profile: GenericGlobalResourc
     log.info("Deleted all KFAM AuthorizationPolicies")
 
 
-def create_or_update_profiles(client: Client, pmr: ProfilesManagementRepresentation):
+def create_or_update_profiles(
+    client: Client,
+    pmr: ProfilesManagementRepresentation,
+):
     """Update the cluster to ensure Profiles and contributors are updated accordingly.
 
     The function ensures that:
@@ -95,3 +98,12 @@ def create_or_update_profiles(client: Client, pmr: ProfilesManagementRepresentat
 
         log.info("Creating or updating the ResourceQuota for Profile %s", profile_name)
         profiles.update_resource_quota(client, existing_profile, profile)
+
+        log.info("Deleting RoleBindings that don't match Profile Contributors.")
+        rbs = list_contributor_rolebindings(client, profile.name)
+        rbs = kfam.delete_rolebindings_not_matching_profile_contributors(client, profile, rbs)
+
+        log.info("Creating RoleBindings for Profile Contributors.")
+        kfam.create_rolebindings_for_profile_contributors(
+            client, profile, existing_rolebindings=rbs
+        )
