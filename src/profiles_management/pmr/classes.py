@@ -154,6 +154,21 @@ class Profile(BaseModel):
     resources: Optional[ResourceQuotaSpecModel] = None
     contributors: Optional[List[Contributor]] = []
 
+    _contributors_dict: dict[str, List[ContributorRole]]
+
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
+
+        # Group contributors based on user name for more efficient retrieval
+        self._contributors_dict = {}
+        if self.contributors is None:
+            return
+
+        for contributor in self.contributors:
+            self._contributors_dict[contributor.name] = self._contributors_dict.get(
+                contributor.name, []
+            ) + [contributor.role]
+
 
 class ProfilesManagementRepresentation:
     """A class representing the Profiles and Contributors.
