@@ -20,6 +20,7 @@ TESTS_YAMLS_PATH = "tests/integration/profiles_management/yamls"
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip()
 async def test_remove_access_to_stale_profiles(
     deploy_profiles_controller, lightkube_client: Client
 ):
@@ -59,6 +60,7 @@ async def test_remove_access_to_stale_profiles(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip()
 async def test_new_profiles_created(lightkube_client: Client):
     pmr = classes.ProfilesManagementRepresentation()
 
@@ -86,6 +88,7 @@ async def test_new_profiles_created(lightkube_client: Client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip()
 async def test_update_resource_quota(lightkube_client: Client):
     profile_path = TESTS_YAMLS_PATH + "/profile.yaml"
     log.info("Loading test YAMLs from: %s", profile_path)

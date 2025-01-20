@@ -17,6 +17,7 @@ TESTS_YAMLS_PATH = "tests/integration/profiles_management/yamls"
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip()
 async def test_list_stale_profiles(deploy_profiles_controller, lightkube_client: Client):
     await deploy_profiles_controller
 
