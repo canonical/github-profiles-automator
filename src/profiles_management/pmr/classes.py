@@ -16,7 +16,8 @@ import logging
 from enum import StrEnum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, ConfigDict, TypeAdapter
+from pydantic.alias_generators import to_camel
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class Operator(StrEnum):
     DoesNotExist = "DoesNotExist"
 
 
-class ScopedResourceSelectorRequirement(BaseModel, extra="forbid"):
+class ScopedResourceSelectorRequirement(BaseModel):
     """Class for objects of matchExpressions of ResourceQuotaSpec.
 
     Args:
@@ -44,12 +45,14 @@ class ScopedResourceSelectorRequirement(BaseModel, extra="forbid"):
         ValidationError: From pydantic if the validation failed.
     """
 
+    model_config = ConfigDict(alias_generator=to_camel, extra="forbid")
+
     operator: Operator
     scope_name: str
     values: Optional[List[str]] = None
 
 
-class ScopeSelector(BaseModel, extra="forbid"):
+class ScopeSelector(BaseModel):
     """Class for ScopeSelector of ResourceQuotaSpec.
 
     Args:
@@ -59,10 +62,12 @@ class ScopeSelector(BaseModel, extra="forbid"):
         ValidationError: From pydantic if the validation failed.
     """
 
+    model_config = ConfigDict(alias_generator=to_camel, extra="forbid")
+
     match_expressions: List[ScopedResourceSelectorRequirement]
 
 
-class ResourceQuotaSpecModel(BaseModel, extra="forbid"):
+class ResourceQuotaSpecModel(BaseModel):
     """Class for K8s ResourceQuotaSpec.
 
     Args:
@@ -74,6 +79,8 @@ class ResourceQuotaSpecModel(BaseModel, extra="forbid"):
     Raises:
         ValidationError: From pydantic if the validation failed.
     """
+
+    model_config = ConfigDict(alias_generator=to_camel, extra="forbid")
 
     hard: Optional[Dict[str, Any]] = None
     scope_selector: Optional[ScopeSelector] = None
