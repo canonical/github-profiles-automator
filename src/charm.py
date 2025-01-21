@@ -101,7 +101,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             self.on[self.pebble_service_name].pebble_custom_notice, self._on_pebble_custom_notice
         )
         # Update the Profiles in case `pmr-yaml-path` has been changed
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.config_changed, self._on_event_sync_profiles)
+        # Update the Profiles in case they didn't update in the first sync
+        self.framework.observe(self.on.update_status, self._on_event_sync_profiles)
 
         # Handlers for all Juju actions
         self.framework.observe(self.on.sync_now_action, self._on_sync_now)
@@ -110,11 +112,11 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             self.on.delete_stale_profiles_action, self._on_delete_stale_profiles
         )
 
-    def _on_config_changed(self, event: ops.ConfigChangedEvent):
+    def _on_event_sync_profiles(self, event: ops.EventBase):
         """Update the Profiles if we can connect to the workload container."""
         if self.container.can_connect():
             self._sync_profiles()
-
+            
     def _on_sync_now(self, event: ops.ActionEvent):
         """Log the Juju action and call sync_now()."""
         logger.info("Juju action sync-now has been triggered.")
