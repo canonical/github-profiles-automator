@@ -1,6 +1,7 @@
 """Generic helpers for manipulating K8s objects, via lightkube."""
 
 import logging
+import re
 
 import tenacity
 from lightkube import Client
@@ -68,21 +69,15 @@ def to_rfc1123_compliant(name: str) -> str:
     Returns:
         The RFC 1123-compliant string.
     """
+    if len(name) == 0:
+        raise ValueError("Can't convert to valid RFC1123 an empty string.")
+
     compliant_str = name.lower()
-    compliant_str = "".join(char if char.isalnum() else "-" for char in compliant_str)
+    compliant_str = re.sub(r"[^a-z0-9-]", "-", compliant_str)
 
-    # remove starting non-alphanum chars
-    i = 0
-    while not compliant_str[i].isalnum():
-        i += 1
-    compliant_str = compliant_str[i:63]
+    compliant_str = compliant_str.lstrip("-").rstrip("-")
 
-    # remove ending non-alphanum chars
-    j = len(compliant_str)
-    while not compliant_str[j - 1].isalnum():
-        j -= 1
-
-    return compliant_str[:j]
+    return compliant_str[:63]
 
 
 @tenacity.retry(stop=tenacity.stop_after_delay(300), wait=tenacity.wait_fixed(5), reraise=True)
