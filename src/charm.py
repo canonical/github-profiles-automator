@@ -182,14 +182,14 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             logger.warning("Could not load YAML file at path: {str(self.config['pmr-yaml-path'])}")
             self.unit.status = ops.BlockedStatus(
                 f"Could not load YAML file at path {str(self.config['pmr-yaml-path'])}."
-                "You may need to configure `pmr-yaml-path`.",
+                "You may need to configure `pmr-yaml-path`. Check the logs for more information.",
             )
             return
         except TypeError as e:
             logger.warning(f"TypeError while creating a Profile from a dictionary: {str(e)}")
             self.unit.status = ops.BlockedStatus(
                 f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}."
-                "You may need to check the file at `pmr-yaml-path`.",
+                "You may need to check the file at `pmr-yaml-path`. Check the logs for more information",
             )
             return
         except ValidationError as e:
@@ -198,7 +198,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             )
             self.unit.status = ops.BlockedStatus(
                 f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}."
-                "You may need to check the file at `pmr-yaml-path`.",
+                "You may need to check the file at `pmr-yaml-path`. Check the logs for more information",
             )
             return
 
