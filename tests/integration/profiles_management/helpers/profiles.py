@@ -34,6 +34,7 @@ def get_profile(client: Client, name: str) -> GenericGlobalResource:
     """
     return client.get(ProfileLightkube, name=name)
 
+
 def list_profiles(client: Client) -> Iterator[GenericGlobalResource]:
     """Return all Profile CRs in the cluster.
 
@@ -44,6 +45,7 @@ def list_profiles(client: Client) -> Iterator[GenericGlobalResource]:
         Iterator of Profiles in the cluster.
     """
     return client.list(ProfileLightkube)
+
 
 def load_profile_from_file(file_path: str, context: dict = {}) -> codecs.AnyResource:
     """Load only Profiles from a YAML file.
