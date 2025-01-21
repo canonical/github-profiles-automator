@@ -283,7 +283,10 @@ def create_rolebindings_for_profile_contributors(
     existing_rolebindings = list_contributor_rolebindings(client, profile.name)
     existing_contributor_roles = kfam_resources_list_to_roles_dict(existing_rolebindings)
 
-    for contributor in profile.contributors or []:
+    if not profile.contributors:
+        return
+
+    for contributor in profile.contributors:
         if contributor.role not in existing_contributor_roles.get(contributor.name, []):
             log.info("Will create RoleBinding for Contributor: %s", contributor)
             client.apply(generate_contributor_rolebinding(contributor, profile.name))
