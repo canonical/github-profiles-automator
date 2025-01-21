@@ -111,17 +111,14 @@ def resource_matches_profile_contributor(
     Returns:
         A boolean representing if the resources matches the expected contributor
     """
-    if profile.contributors is None:
-        return False
-
-    if not has_kfam_annotations(resource):
+    if not profile.contributors or not has_kfam_annotations(resource):
+        log.info("No profile contributors or kfam annotations were found in the resource.")
         return False
 
     role = get_contributor_role(resource)
     user = get_contributor_user(resource)
-    for contributor_role in profile._contributors_dict.get(user, []):
-        if contributor_role == role:
-            return True
+    if role in profile._contributors_dict.get(user, []):
+        return True
 
     return False
 
