@@ -188,8 +188,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         except TypeError as e:
             logger.warning(f"TypeError while creating a Profile from a dictionary: {str(e)}")
             self.unit.status = ops.BlockedStatus(
-                f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}."
-                "You may need to check the file at `pmr-yaml-path`. Check the logs for more information",
+                f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}. "
+                "You may need to check the file at `pmr-yaml-path`. "
+                "Check the logs for more information",
             )
             return
         except ValidationError as e:
@@ -197,8 +198,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 f"ValidationError while creating a Profile from a dictionary: {e.errors()}"
             )
             self.unit.status = ops.BlockedStatus(
-                f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}."
-                "You may need to check the file at `pmr-yaml-path`. Check the logs for more information",
+                f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}. "
+                "You may need to check the file at `pmr-yaml-path`. "
+                "Check the logs for more information",
             )
             return
 
