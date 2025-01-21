@@ -111,8 +111,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         )
 
     def _on_config_changed(self, event: ops.ConfigChangedEvent):
-        """Update the Profiles."""
-        self._sync_profiles()
+        """Update the Profiles if we can connect to the workload container."""
+        if self.container.can_connect():
+            self._sync_profiles()
 
     def _on_sync_now(self, event: ops.ActionEvent):
         """Log the Juju action and call sync_now()."""
