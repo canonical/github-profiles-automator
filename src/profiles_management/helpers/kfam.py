@@ -19,7 +19,6 @@ AuthorizationPolicy = create_namespaced_resource(
     kind="AuthorizationPolicy",
     plural="authorizationpolicies",
 )
-KFAMResource = TypeVar("KFAMResource", GenericNamespacedResource, RoleBinding)
 
 
 def has_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> bool:
