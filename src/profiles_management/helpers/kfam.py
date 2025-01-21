@@ -280,7 +280,7 @@ def create_rolebindings_for_profile_contributors(
     client: Client,
     profile: classes.Profile,
     existing_rolebindings: List[RoleBinding],
-):
+) -> None:
     """Create RoleBindings for all contributors defined in a Profile, in the PMR.
 
     If a RoleBinding already exists for the specific Contributor name and role, then
