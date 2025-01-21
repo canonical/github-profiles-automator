@@ -1,7 +1,7 @@
 """Utility module for manipulating KFAM resources."""
 
 import logging
-from typing import List, TypeVar
+from typing import List
 
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from lightkube import Client
@@ -9,7 +9,7 @@ from lightkube.generic_resource import GenericNamespacedResource, create_namespa
 from lightkube.resources.rbac_authorization_v1 import RoleBinding
 
 from profiles_management.helpers import k8s
-from profiles_management.pmr import classes
+from profiles_management.pmr.classes import Contributor, ContributorRole, Profile
 
 log = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ AuthorizationPolicy = create_namespaced_resource(
 )
 
 
-def has_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> bool:
+def has_valid_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> bool:
     """Check if resource has "user" and "role" KFAM annotations.
 
     The function will also ensure the the value for "role", in the annotations" will have
@@ -34,16 +34,14 @@ def has_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> b
         A boolean if the provided resources has a `role` and `user` annotation.
     """
     annotations = k8s.get_annotations(resource)
-    if "user" not in annotations or "role" not in annotations:
-        return False
+    if annotations:
+        return (
+            "user" in annotations
+            and "role" in annotations
+            and annotations["role"].upper() in ContributorRole.__members__
+        )
 
-    try:
-        classes.ContributorRole(annotations["role"])
-    except ValueError:
-        # String in annotation doesn't match expected KFAM role
-        return False
-
-    return True
+    return False
 
 
 def resource_is_for_profile_owner(resource: GenericNamespacedResource | RoleBinding) -> bool:
@@ -73,7 +71,7 @@ def get_contributor_user(resource: GenericNamespacedResource | RoleBinding) -> s
     Returns:
         The user defined in metadata.annotations.user of the resource.
     """
-    if not has_kfam_annotations(resource):
+    if not has_valid_kfam_annotations(resource):
         raise ValueError("Resource doesn't have KFAM metadata: %s" % k8s.get_name(resource))
 
     annotations = k8s.get_annotations(resource)
@@ -82,7 +80,7 @@ def get_contributor_user(resource: GenericNamespacedResource | RoleBinding) -> s
 
 def get_contributor_role(
     resource: GenericNamespacedResource | RoleBinding,
-) -> classes.ContributorRole:
+) -> ContributorRole:
     """Return role in KFAM annotation.
 
     Raises:
@@ -91,15 +89,15 @@ def get_contributor_role(
     Returns:
         The user defined in metadata.annotations.user of the resource.
     """
-    if not has_kfam_annotations(resource):
+    if not has_valid_kfam_annotations(resource):
         raise ValueError("Resource doesn't have KFAM metadata: %s" % k8s.get_name(resource))
 
     annotations = k8s.get_annotations(resource)
-    return classes.ContributorRole(annotations["role"])
+    return ContributorRole(annotations["role"])
 
 
 def resource_matches_profile_contributor(
-    resource: RoleBinding | GenericNamespacedResource, profile: classes.Profile
+    resource: RoleBinding | GenericNamespacedResource, profile: Profile
 ) -> bool:
     """Check if the user and it's role in the RoleBinding match the PMR.
 
@@ -111,7 +109,7 @@ def resource_matches_profile_contributor(
     Returns:
         A boolean representing if the resources matches the expected contributor
     """
-    if not profile.contributors or not has_kfam_annotations(resource):
+    if not profile.contributors or not has_valid_kfam_annotations(resource):
         log.info("No profile contributors or kfam annotations were found in the resource.")
         return False
 
@@ -123,9 +121,7 @@ def resource_matches_profile_contributor(
     return False
 
 
-def generate_contributor_rolebinding(
-    contributor: classes.Contributor, namespace: str
-) -> RoleBinding:
+def generate_contributor_rolebinding(contributor: Contributor, namespace: str) -> RoleBinding:
     """Generate RoleBinding for a PMR Contributor.
 
     Args:
@@ -182,7 +178,7 @@ def list_contributor_rolebindings(client: Client, namespace="") -> List[RoleBind
     return [
         rb
         for rb in role_bindings
-        if has_kfam_annotations(rb) and not resource_is_for_profile_owner(rb)
+        if has_valid_kfam_annotations(rb) and not resource_is_for_profile_owner(rb)
     ]
 
 
@@ -211,13 +207,13 @@ def list_contributor_authorization_policies(
     return [
         ap
         for ap in authorization_policies
-        if has_kfam_annotations(ap) and not resource_is_for_profile_owner(ap)
+        if has_valid_kfam_annotations(ap) and not resource_is_for_profile_owner(ap)
     ]
 
 
 def kfam_resources_list_to_roles_dict(
     resources: List[RoleBinding] | List[GenericNamespacedResource],
-) -> dict[str, List[classes.ContributorRole]]:
+) -> dict[str, List[ContributorRole]]:
     """Convert list of KFAM RoleBindings or AuthorizationPolicies to dict.
 
     The user of the resource will be used as a key and its role as the value.
@@ -231,7 +227,7 @@ def kfam_resources_list_to_roles_dict(
     """
     contributor_roles_dict = {}
     for resource in resources:
-        if has_kfam_annotations(resource):
+        if has_valid_kfam_annotations(resource):
             user = get_contributor_user(resource)
             role = get_contributor_role(resource)
             contributor_roles_dict[user] = contributor_roles_dict.get(user, []) + [role]
@@ -241,7 +237,7 @@ def kfam_resources_list_to_roles_dict(
 
 def delete_rolebindings_not_matching_profile_contributors(
     client: Client,
-    profile: classes.Profile,
+    profile: Profile,
 ) -> None:
     """Delete RoleBindings in the cluster that doesn't match Contributors in PMR Profile.
 
@@ -267,7 +263,7 @@ def delete_rolebindings_not_matching_profile_contributors(
 
 def create_rolebindings_for_profile_contributors(
     client: Client,
-    profile: classes.Profile,
+    profile: Profile,
 ) -> None:
     """Create RoleBindings for all contributors defined in a Profile, in the PMR.
 

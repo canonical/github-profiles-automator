@@ -7,7 +7,7 @@ from lightkube.resources.rbac_authorization_v1 import RoleBinding
 from profiles_management.helpers.kfam import (
     get_contributor_role,
     get_contributor_user,
-    has_kfam_annotations,
+    has_valid_kfam_annotations,
     resource_is_for_profile_owner,
     resource_matches_profile_contributor,
 )
@@ -19,7 +19,7 @@ def test_kfam_resource():
         metadata=ObjectMeta(name="test", annotations={"role": "admin", "user": "test"})
     )
 
-    assert has_kfam_annotations(resource)
+    assert has_valid_kfam_annotations(resource)
 
 
 def test_wrong_kfam_role_annotation():
@@ -27,13 +27,13 @@ def test_wrong_kfam_role_annotation():
         metadata=ObjectMeta(name="test", annotations={"role": "overlord", "user": "test"})
     )
 
-    assert not has_kfam_annotations(resource)
+    assert not has_valid_kfam_annotations(resource)
 
 
 def test_non_kfam_resource():
     resource = GenericNamespacedResource(metadata=ObjectMeta(name="test"))
 
-    assert not has_kfam_annotations(resource)
+    assert not has_valid_kfam_annotations(resource)
 
 
 @pytest.mark.parametrize(
