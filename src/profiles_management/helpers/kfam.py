@@ -245,20 +245,15 @@ def kfam_resources_list_to_roles_dict(
 def delete_rolebindings_not_matching_profile_contributors(
     client: Client,
     profile: classes.Profile,
-    existing_rolebindings: List[RoleBinding],
-) -> List[RoleBinding]:
+) -> None:
     """Delete RoleBindings in the cluster that doesn't match Contributors in PMR Profile.
 
     Args:
         client: The lightkube client to use.
         profile: The PMR Profile to create RoleBindings based on its Contributors.
-        existing_rolebindings: RoleBindings in the cluster that will be evaluated for deletion.
-
-    Returns:
-        The remaining resources, after removing the deleted ones from the existing_resources.
     """
+    existing_rolebindings = list_contributor_rolebindings(client, profile.name)
     role_bindings_to_delete = []
-    remaining_role_bindings = []
 
     for rb in existing_rolebindings:
         if not resource_matches_profile_contributor(rb, profile):
@@ -267,19 +262,15 @@ def delete_rolebindings_not_matching_profile_contributors(
                 k8s.get_name(rb),
             )
             role_bindings_to_delete.append(rb)
-        else:
-            remaining_role_bindings.append(rb)
 
-    log.info("Deleting all resources that don't match the PMR.")
-    delete_many(client, role_bindings_to_delete, logger=log)
-
-    return remaining_role_bindings
+    if role_bindings_to_delete:
+        log.info("Deleting all resources that don't match the PMR.")
+        delete_many(client, role_bindings_to_delete, logger=log)
 
 
 def create_rolebindings_for_profile_contributors(
     client: Client,
     profile: classes.Profile,
-    existing_rolebindings: List[RoleBinding],
 ) -> None:
     """Create RoleBindings for all contributors defined in a Profile, in the PMR.
 
@@ -292,6 +283,7 @@ def create_rolebindings_for_profile_contributors(
         existing_rolebindings: List of existing RoleBindings, to avoid doing redundant
                                API requests
     """
+    existing_rolebindings = list_contributor_rolebindings(client, profile.name)
     existing_contributor_roles = kfam_resources_list_to_roles_dict(existing_rolebindings)
 
     for contributor in profile.contributors or []:

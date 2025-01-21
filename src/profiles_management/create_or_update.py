@@ -100,10 +100,7 @@ def create_or_update_profiles(
         profiles.update_resource_quota(client, existing_profile, profile)
 
         log.info("Deleting RoleBindings that don't match Profile: %s", profile_name)
-        rbs = list_contributor_rolebindings(client, profile.name)
-        rbs = kfam.delete_rolebindings_not_matching_profile_contributors(client, profile, rbs)
+        kfam.delete_rolebindings_not_matching_profile_contributors(client, profile)
 
         log.info("Creating RoleBindings for Profile: %s", profile_name)
-        kfam.create_rolebindings_for_profile_contributors(
-            client, profile, existing_rolebindings=rbs
-        )
+        kfam.create_rolebindings_for_profile_contributors(client, profile)
