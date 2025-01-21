@@ -100,6 +100,8 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         self.framework.observe(
             self.on[self.pebble_service_name].pebble_custom_notice, self._on_pebble_custom_notice
         )
+        # Update the Profiles in case `pmr-yaml-path` has been changed
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
 
         # Handlers for all Juju actions
         self.framework.observe(self.on.sync_now_action, self._on_sync_now)
@@ -107,6 +109,10 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         self.framework.observe(
             self.on.delete_stale_profiles_action, self._on_delete_stale_profiles
         )
+
+    def _on_config_changed(self, event: ops.ConfigChangedEvent):
+        """Update the Profiles."""
+        self._sync_profiles()
 
     def _on_sync_now(self, event: ops.ActionEvent):
         """Log the Juju action and call sync_now()."""
