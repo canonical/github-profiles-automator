@@ -116,7 +116,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         """Update the Profiles if we can connect to the workload container."""
         if self.container.can_connect():
             self._sync_profiles()
-            
+
     def _on_sync_now(self, event: ops.ActionEvent):
         """Log the Juju action and call sync_now()."""
         logger.info("Juju action sync-now has been triggered.")
