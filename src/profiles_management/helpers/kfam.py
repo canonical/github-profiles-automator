@@ -24,7 +24,7 @@ AuthorizationPolicy = create_namespaced_resource(
 def has_valid_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> bool:
     """Check if resource has "user" and "role" KFAM annotations.
 
-    The function will also ensure the the value for "role", in the annotations" will have
+    The function will also ensure that the value for "role", in the annotations will have
     one of the expected values: admin, edit, view
 
     Args:
