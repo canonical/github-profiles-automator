@@ -24,7 +24,8 @@ def get_name(res: GenericNamespacedResource | GenericGlobalResource | RoleBindin
     """Return the name from generic lightkube resource.
 
     Args:
-        res: The resource to get it's name from metadata.name
+        res: The resource (Profile, AuthorizationPolicy or RoleBinding) to get it's name
+        from metadata.name
 
     Raises:
         ValueError: if the object doesn't have metadata or metadata.name
