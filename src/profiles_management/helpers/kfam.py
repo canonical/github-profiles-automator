@@ -99,7 +99,7 @@ def get_contributor_role(
 def resource_matches_profile_contributor(
     resource: RoleBinding | GenericNamespacedResource, profile: Profile
 ) -> bool:
-    """Check if the user and it's role in the RoleBinding match the PMR.
+    """Check if the user and its role in the RoleBinding match the PMR.
 
     Args:
         resource: The AuthorizationPolicy or RoleBinding to check if it matches any
