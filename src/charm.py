@@ -152,11 +152,12 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
 
     def _on_pebble_custom_notice(self, event: ops.PebbleNoticeEvent):
         """Call sync_now if the custom notice has the specified notice key."""
-        if event.notice.key == "github-profiles-automator.com/sync":
-            logger.info(f"Custom notice {event.notice.key} received, syncing profiles.")
-            self._sync_profiles()
-        else:
+        if event.notice.key != "github-profiles-automator.com/sync":
             logger.info(f"Custom notice {event.notice.key} ignored.")
+            return
+        
+        logger.info(f"Custom notice {event.notice.key} received, syncing profiles.")
+        self._sync_profiles()
 
     def _sync_profiles(self):
         """Sync the Kubeflow Profiles based on the YAML file at `pmr-yaml-path`."""
