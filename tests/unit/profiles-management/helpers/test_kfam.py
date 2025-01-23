@@ -14,43 +14,38 @@ from profiles_management.helpers.kfam import (
 from profiles_management.pmr.classes import Contributor, ContributorRole, Owner, Profile, UserKind
 
 
-def test_kfam_resource():
-    resource = GenericNamespacedResource(
-        metadata=ObjectMeta(name="test", annotations={"role": "admin", "user": "test"})
-    )
-
-    assert has_valid_kfam_annotations(resource)
-
-
-def test_wrong_kfam_role_annotation():
-    resource = GenericNamespacedResource(
-        metadata=ObjectMeta(name="test", annotations={"role": "overlord", "user": "test"})
-    )
-
-    assert not has_valid_kfam_annotations(resource)
-
-
-def test_non_kfam_resource():
-    resource = GenericNamespacedResource(metadata=ObjectMeta(name="test"))
-
-    assert not has_valid_kfam_annotations(resource)
+@pytest.mark.parametrize(
+    "resource,has_annotations",
+    [
+        (
+            GenericNamespacedResource(
+                metadata=ObjectMeta(name="test", annotations={"role": "admin", "user": "test"})
+            ),
+            True,
+        ),
+        (
+            GenericNamespacedResource(
+                metadata=ObjectMeta(name="test", annotations={"role": "overlord", "user": "test"})
+            ),
+            False,
+        ),
+        (GenericNamespacedResource(metadata=ObjectMeta(name="test")), False),
+    ],
+)
+def test_kfam_annotations(resource, has_annotations):
+    assert has_valid_kfam_annotations(resource) == has_annotations
 
 
 @pytest.mark.parametrize(
-    "resource",
+    "resource,is_for_owner",
     [
-        GenericNamespacedResource(metadata=ObjectMeta(name="namespaceAdmin")),
-        GenericNamespacedResource(metadata=ObjectMeta(name="ns-owner-access-istio")),
+        (GenericNamespacedResource(metadata=ObjectMeta(name="namespaceAdmin")), True),
+        (GenericNamespacedResource(metadata=ObjectMeta(name="ns-owner-access-istio")), True),
+        (GenericNamespacedResource(metadata=ObjectMeta(name="random")), False),
     ],
 )
-def test_profile_owner_resource(resource):
-    assert resource_is_for_profile_owner(resource)
-
-
-def test_non_profile_owner_resource():
-    resource = GenericNamespacedResource(metadata=ObjectMeta(name="random"))
-
-    assert not resource_is_for_profile_owner(resource)
+def test_profile_owner_resource(resource, is_for_owner):
+    assert resource_is_for_profile_owner(resource) == is_for_owner
 
 
 def test_contributor_getters():
@@ -64,49 +59,49 @@ def test_contributor_getters():
     assert get_contributor_role(resource) == role
 
 
-def test_rolebinding_not_matching_empty_profile_contributors():
-    rb = RoleBinding(
-        metadata=ObjectMeta(annotations={"user": "test", "role": "admin"}),
-        roleRef=RoleRef(apiGroup="", kind="", name=""),
-    )
-
-    profile = Profile(
-        name="test",
-        owner=Owner(name="test", kind=UserKind.USER),
-        contributors=[],
-        resources={},
-    )
-
-    assert not resource_matches_profile_contributor(rb, profile)
-
-
-def test_rolebinding_not_matching_profile_contributors():
-    rb = RoleBinding(
-        metadata=ObjectMeta(annotations={"user": "test", "role": "admin"}),
-        roleRef=RoleRef(apiGroup="", kind="", name=""),
-    )
-
-    profile = Profile(
-        name="test",
-        owner=Owner(name="test", kind=UserKind.USER),
-        contributors=[Contributor(name="test", role=ContributorRole.VIEW)],
-        resources={},
-    )
-
-    assert not resource_matches_profile_contributor(rb, profile)
-
-
-def test_rolebinding_matching_profile_contributors():
-    rb = RoleBinding(
-        metadata=ObjectMeta(annotations={"user": "test", "role": "admin"}),
-        roleRef=RoleRef(apiGroup="", kind="", name=""),
-    )
-
-    profile = Profile(
-        name="test",
-        owner=Owner(name="test", kind=UserKind.USER),
-        contributors=[Contributor(name="test", role=ContributorRole.ADMIN)],
-        resources={},
-    )
-
-    assert resource_matches_profile_contributor(rb, profile)
+@pytest.mark.parametrize(
+    "rb,profile,matches_contributors",
+    [
+        (
+            RoleBinding(
+                metadata=ObjectMeta(annotations={"user": "test", "role": "admin"}),
+                roleRef=RoleRef(apiGroup="", kind="", name=""),
+            ),
+            Profile(
+                name="test",
+                owner=Owner(name="test", kind=UserKind.USER),
+                contributors=[],
+                resources={},
+            ),
+            False,
+        ),
+        (
+            RoleBinding(
+                metadata=ObjectMeta(annotations={"user": "test", "role": "admin"}),
+                roleRef=RoleRef(apiGroup="", kind="", name=""),
+            ),
+            Profile(
+                name="test",
+                owner=Owner(name="test", kind=UserKind.USER),
+                contributors=[Contributor(name="test", role=ContributorRole.VIEW)],
+                resources={},
+            ),
+            False,
+        ),
+        (
+            RoleBinding(
+                metadata=ObjectMeta(annotations={"user": "test", "role": "admin"}),
+                roleRef=RoleRef(apiGroup="", kind="", name=""),
+            ),
+            Profile(
+                name="test",
+                owner=Owner(name="test", kind=UserKind.USER),
+                contributors=[Contributor(name="test", role=ContributorRole.ADMIN)],
+                resources={},
+            ),
+            True,
+        ),
+    ],
+)
+def test_rolebinding_not_matching_empty_profile_contributors(rb, profile, matches_contributors):
+    assert resource_matches_profile_contributor(rb, profile) == matches_contributors
