@@ -169,6 +169,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
     def _get_pmr_from_yaml(self) -> ProfilesManagementRepresentation | None:
         """Return the PMR based on the YAML file in `repository` under `pmr-yaml-path`.
 
+        If the function fails to load the PMR, it sets the charm's status to Blocked with a status
+        message.
+
         Returns:
             The PMR, or None if the YAML file cannot be loaded
 
