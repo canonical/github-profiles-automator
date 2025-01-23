@@ -41,7 +41,7 @@ def get_model(ops_test: OpsTest) -> juju.model.Model:
 
     Returns:
         A juju.model.Model instance of the current model.
-    
+
     Raises:
         AssertionError if the test doesn't have a Juju model.
     """
@@ -56,7 +56,7 @@ def get_application(ops_test: OpsTest) -> juju.application.Application:
 
     Returns:
         A juju.application.Application of the current application.
-    
+
     Raises:
         AssertionError if the application doesn't exist.
     """
@@ -72,7 +72,7 @@ def load_yaml_from_url(repo_url, yaml_path) -> dict:
 
     Returns:
         A dictionary of the YAML at the specified location.
-    
+
     """
     # GitHub URL for raw file content
     raw_file_url = repo_url.replace(".git", f"/{GITHUB_GIT_REVISION}/{yaml_path}").replace(
