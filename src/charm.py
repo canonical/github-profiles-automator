@@ -177,9 +177,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         Raises:
             ErrorWithStatus: If the YAML at `pmr-yaml-path` could not be loaded.
         """
-        yaml_file_path = CLONED_REPO_PATH + str(self.config["pmr-yaml-path"])
+        pmr_file_path = CLONED_REPO_PATH + str(self.config["pmr-yaml-path"])
         try:
-            yaml_file = self.container.pull(yaml_file_path)
+            yaml_file = self.container.pull(pmr_file_path)
             loaded_yaml = yaml.safe_load(yaml_file)
             pmr = ProfilesManagementRepresentation()
             for profile_dict in loaded_yaml["profiles"]:
