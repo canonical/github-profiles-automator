@@ -70,8 +70,8 @@ def to_rfc1123_compliant(name: str) -> str:
     Returns:
         The RFC 1123-compliant string.
     """
-    if len(name) == 0:
-        raise ValueError("Can't convert to valid RFC1123 an empty string.")
+    if not name:
+        return ""
 
     compliant_str = name.lower()
     compliant_str = re.sub(r"[^a-z0-9-]", "-", compliant_str)
