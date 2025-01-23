@@ -188,16 +188,17 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 pmr.add_profile(Profile.model_validate(profile_dict))
             return pmr
         except ops.pebble.PathError:
-            logger.warning(
-                f"Could not load YAML file at path: {str(self.config['pmr-yaml-path'])}"
+            logger.error(
+                f"Error reading file at path: {str(self.config['pmr-yaml-path'])}. "
+                "The file may not exist or is a directory."
             )
             self.unit.status = ops.BlockedStatus(
-                f"Could not load YAML file at path {str(self.config['pmr-yaml-path'])}."
+                f"Could not load YAML file at path {str(self.config['pmr-yaml-path'])}. "
                 "You may need to configure `pmr-yaml-path`. Check the logs for more information.",
             )
             return
         except TypeError as e:
-            logger.warning(f"TypeError while creating a Profile from a dictionary: {str(e)}")
+            logger.error(f"TypeError while creating a Profile from a dictionary: {str(e)}")
             self.unit.status = ops.BlockedStatus(
                 f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}. "
                 "You may need to check the file at `pmr-yaml-path`. "
@@ -205,7 +206,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             )
             return
         except ValidationError as e:
-            logger.warning(
+            logger.error(
                 f"ValidationError while creating a Profile from a dictionary: {e.errors()}"
             )
             self.unit.status = ops.BlockedStatus(
