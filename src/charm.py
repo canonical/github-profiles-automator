@@ -121,6 +121,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         """Log the Juju action and call sync_now()."""
         logger.info("Juju action sync-now has been triggered.")
         event.log("Running sync-now...")
+        event.log("Updating Profiles based on the provided PMR.")
         self._sync_profiles()
         event.log("Profiles have been synced.")
 
@@ -128,6 +129,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         """List the stale Profiles on the cluster."""
         logger.info("Juju action list-stale-profiles has been triggered.")
         event.log("Running list-stale-profiles...")
+        event.log("Finding all Profiles that are not present in the PMR.")
         pmr = self._get_pmr_from_yaml()
         if not pmr:
             logger.info("PMR is empty, nothing to do.")
@@ -140,6 +142,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         """Delete all stale Profiles on the cluster."""
         logger.info("Juju action delete-stale-profiles has been triggered.")
         event.log("Running delete-stale-profiles...")
+        event.log("Deleting all Profiles that are not present in the PMR.")
         pmr = self._get_pmr_from_yaml()
         if not pmr:
             logger.info("PMR is empty, nothing to do.")
