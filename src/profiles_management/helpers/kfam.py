@@ -250,9 +250,16 @@ def delete_rolebindings_not_matching_profile_contributors(
 ) -> None:
     """Delete RoleBindings in the cluster that doesn't match Contributors in PMR Profile.
 
+    The function will be handling 404 errors, in case the RoleBinding doesn't exist in the
+    cluster.
+
     Args:
         client: The lightkube client to use.
         profile: The PMR Profile to create RoleBindings based on its Contributors.
+
+    Raises:
+        ApiError: From lightkube if something unexpected occurred while deleting the
+                  resources.
     """
     existing_rolebindings = list_contributor_rolebindings(client, profile.name)
     role_bindings_to_delete = []
@@ -284,6 +291,10 @@ def create_rolebindings_for_profile_contributors(
         profile: The PMR to iterate over its Contributors.
         existing_rolebindings: List of existing RoleBindings, to avoid doing redundant
                                API requests
+
+    Raises:
+        ApiError: From lightkube if there was an error while trying to create the
+                  RoleBindings.
     """
     existing_rolebindings = list_contributor_rolebindings(client, profile.name)
     existing_contributor_roles = kfam_resources_list_to_roles_dict(existing_rolebindings)

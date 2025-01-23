@@ -74,6 +74,8 @@ def create_or_update_profiles(
              should exist in the cluster.
 
     Raises:
+        ApiError: From lightkube if an error occurred while trying to create or delete
+                  Profiles, RoleBindings or AuthorizationPolicies.
         InvalidKfamAnnotationsError: If a RoleBinding or AuthorizationPolicy does not have
                                      KFAM valid annotations.
     """
