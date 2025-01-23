@@ -1,3 +1,4 @@
+import pytest
 from lightkube.generic_resource import GenericNamespacedResource
 from lightkube.models.meta_v1 import ObjectMeta
 
@@ -18,20 +19,21 @@ def test_no_annotations():
     assert get_annotations(resource) == {}
 
 
-def test_rfc1123_non_alphanum_to_hyphen():
-    name = "kimonas@canonical.com"
-
-    assert to_rfc1123_compliant(name) == "kimonas-canonical-com"
-
-
-def test_rfc1123_more_than_63_char_name():
-    name = "I-had-to-think-of-a-reeeally-long-string-to-use-for-the-test-which-was-tough"
-
-    assert len(name) > 63
-    assert len(to_rfc1123_compliant(name)) == 63
-
-
-def test_rfc1123_strip_starting_and_trailing_dashes():
-    name = "-=shouldn't have trailing dashes!"
-
-    assert to_rfc1123_compliant(name) == "shouldn-t-have-trailing-dashes"
+@pytest.mark.parametrize(
+    "name,expected",
+    [
+        ("kimonas@canonical.com", "kimonas-canonical-com"),
+        (
+            "I-had-to-think-of-a-reeeally-long-string-to-use-for-the-test-which-was-tough",
+            "i-had-to-think-of-a-reeeally-long-string-to-use-for-the-test-wh",
+        ),
+        ("-=shouldn't have trailing dashes!", "shouldn-t-have-trailing-dashes"),
+        ("", ""),
+        ("abcdefg", "abcdefg"),
+        ("1234", "1234"),
+        ("$%%@#", ""),
+    ],
+)
+def test_rfc1123(name, expected):
+    assert len(to_rfc1123_compliant(name)) < 64
+    assert to_rfc1123_compliant(name) == expected
