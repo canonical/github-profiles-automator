@@ -3,6 +3,7 @@
 import logging
 from pathlib import Path
 
+import juju
 import lightkube
 import pytest
 import requests
@@ -30,13 +31,17 @@ KUBEFLOW_PROFILES_TRUST = True
 
 @pytest.fixture(scope="session")
 def lightkube_client() -> lightkube.Client:
+    """Return a lightkube client to use in this session."""
     client = lightkube.Client(field_manager=CHARM_NAME)
     return client
 
 
-def get_model(ops_test: OpsTest):
+def get_model(ops_test: OpsTest) -> juju.model.Model:
     """Return the Juju model of the current test.
 
+    Returns:
+        A juju.model.Model instance of the current model.
+    
     Raises:
         AssertionError if the test doesn't have a Juju model.
     """
@@ -46,9 +51,12 @@ def get_model(ops_test: OpsTest):
     return model
 
 
-def get_application(ops_test: OpsTest):
+def get_application(ops_test: OpsTest) -> juju.application.Application:
     """Return the charm's application in the current test.
 
+    Returns:
+        A juju.application.Application of the current application.
+    
     Raises:
         AssertionError if the application doesn't exist.
     """
@@ -59,8 +67,13 @@ def get_application(ops_test: OpsTest):
     return app
 
 
-def load_yaml_from_url(repo_url, yaml_path):
-    """Load a YAML file at a specified path in a GitHub repository."""
+def load_yaml_from_url(repo_url, yaml_path) -> dict:
+    """Load a YAML file at a specified path in a GitHub repository.
+
+    Returns:
+        A dictionary of the YAML at the specified location.
+    
+    """
     # GitHub URL for raw file content
     raw_file_url = repo_url.replace(".git", f"/{GITHUB_GIT_REVISION}/{yaml_path}").replace(
         "https://github.com", "https://raw.githubusercontent.com"
