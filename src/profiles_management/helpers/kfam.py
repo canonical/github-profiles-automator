@@ -118,10 +118,6 @@ def resource_matches_profile_contributor(
     Returns:
         A boolean representing if the resources matches the expected contributor
     """
-    if not profile.contributors or not has_valid_kfam_annotations(resource):
-        log.info("No profile contributors or kfam annotations were found in the resource.")
-        return False
-
     role = get_contributor_role(resource)
     user = get_contributor_user(resource)
     if role in profile._contributors_dict.get(user, []):
@@ -264,13 +260,16 @@ def delete_rolebindings_not_matching_profile_contributors(
     existing_rolebindings = list_contributor_rolebindings(client, profile.name)
     role_bindings_to_delete = []
 
-    for rb in existing_rolebindings:
-        if not resource_matches_profile_contributor(rb, profile):
-            log.info(
-                "RoleBinding '%s' doesn't belong to Profile. Will delete it.",
-                k8s.get_name(rb),
-            )
-            role_bindings_to_delete.append(rb)
+    if not profile.contributors:
+        role_bindings_to_delete = existing_rolebindings
+    else:
+        for rb in existing_rolebindings:
+            if not resource_matches_profile_contributor(rb, profile):
+                log.info(
+                    "RoleBinding '%s' doesn't belong to Profile. Will delete it.",
+                    k8s.get_name(rb),
+                )
+                role_bindings_to_delete.append(rb)
 
     if role_bindings_to_delete:
         log.info("Deleting all resources that don't match the PMR.")
