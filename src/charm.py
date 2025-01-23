@@ -155,7 +155,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         if event.notice.key != "github-profiles-automator.com/sync":
             logger.info(f"Custom notice {event.notice.key} ignored.")
             return
-        
+
         logger.info(f"Custom notice {event.notice.key} received, syncing profiles.")
         self._sync_profiles()
 
@@ -188,7 +188,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 pmr.add_profile(Profile.model_validate(profile_dict))
             return pmr
         except ops.pebble.PathError:
-            logger.warning(f"Could not load YAML file at path: {str(self.config['pmr-yaml-path'])}")
+            logger.warning(
+                f"Could not load YAML file at path: {str(self.config['pmr-yaml-path'])}"
+            )
             self.unit.status = ops.BlockedStatus(
                 f"Could not load YAML file at path {str(self.config['pmr-yaml-path'])}."
                 "You may need to configure `pmr-yaml-path`. Check the logs for more information.",
