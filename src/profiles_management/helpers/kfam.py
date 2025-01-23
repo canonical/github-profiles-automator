@@ -21,6 +21,12 @@ AuthorizationPolicy = create_namespaced_resource(
 )
 
 
+class InvalidKfamAnnotationsError(Exception):
+    """Exception for when KFAM Annotations were expected but not found in object."""
+
+    pass
+
+
 def has_valid_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> bool:
     """Check if resource has "user" and "role" KFAM annotations.
 
@@ -66,16 +72,17 @@ def get_contributor_user(resource: GenericNamespacedResource | RoleBinding) -> s
     """Return user in KFAM annotation.
 
     Raises:
-        ValueError: If the object does not have KFAM annotations.
+        InvalidKfamAnnotationsError: If the object does not have KFAM annotations.
 
     Returns:
         The user defined in metadata.annotations.user of the resource.
     """
     if not has_valid_kfam_annotations(resource):
-        raise ValueError("Resource doesn't have KFAM metadata: %s" % k8s.get_name(resource))
+        raise InvalidKfamAnnotationsError(
+            "Resource doesn't have valid KFAM metadata: %s" % k8s.get_name(resource)
+        )
 
-    annotations = k8s.get_annotations(resource)
-    return annotations["user"]
+    return k8s.get_annotations(resource)["user"]
 
 
 def get_contributor_role(
@@ -84,13 +91,15 @@ def get_contributor_role(
     """Return role in KFAM annotation.
 
     Raises:
-        ValueError: If the object does not have valid KFAM annotations.
+        InvalidKfamAnnotationsError: If the object does not have valid KFAM annotations.
 
     Returns:
         The user defined in metadata.annotations.user of the resource.
     """
     if not has_valid_kfam_annotations(resource):
-        raise ValueError("Resource doesn't have KFAM metadata: %s" % k8s.get_name(resource))
+        raise InvalidKfamAnnotationsError(
+            "Resource doesn't have invalid KFAM metadata: %s" % k8s.get_name(resource)
+        )
 
     annotations = k8s.get_annotations(resource)
     return ContributorRole(annotations["role"])

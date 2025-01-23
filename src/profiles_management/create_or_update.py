@@ -72,6 +72,10 @@ def create_or_update_profiles(
         client: The lightkube client to use.
         pmr: The ProfilesManagementRepresentation expressing what Profiles and contributors
              should exist in the cluster.
+
+    Raises:
+        InvalidKfamAnnotationsError: If a RoleBinding or AuthorizationPolicy does not have
+                                     KFAM valid annotations.
     """
     log.info("Fetching all Profiles in the cluster")
 
