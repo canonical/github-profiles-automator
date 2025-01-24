@@ -232,10 +232,9 @@ def kfam_resources_list_to_roles_dict(
     """
     contributor_roles_dict = {}
     for resource in resources:
-        if has_valid_kfam_annotations(resource):
-            user = get_contributor_user(resource)
-            role = get_contributor_role(resource)
-            contributor_roles_dict[user] = contributor_roles_dict.get(user, []) + [role]
+        user = get_contributor_user(resource)
+        role = get_contributor_role(resource)
+        contributor_roles_dict[user] = contributor_roles_dict.get(user, []) + [role]
 
     return contributor_roles_dict
 
