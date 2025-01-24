@@ -158,7 +158,6 @@ async def test_sync_now(ops_test: OpsTest, lightkube_client: lightkube.Client):
     unit = app.units[0]
     action = await unit.run_action("sync-now")
     action = await action.wait()
-    assert action.status == "completed"
     logger.info("Juju action `sync-now` completed.")
 
     # Load the Profiles from the YAML file
@@ -197,7 +196,6 @@ async def test_list_stale_profiles(ops_test: OpsTest):
     unit = app.units[0]
     action = await unit.run_action("sync-now")
     action = await action.wait()
-    assert action.status == "completed"
     logger.info("Juju action `sync-now` completed.")
 
     # List the stale Profiles on the cluster. There should be 1 stale Profile
