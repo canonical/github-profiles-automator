@@ -86,6 +86,30 @@ def load_yaml_from_url(repo_url, yaml_path) -> dict:
     return yaml_content
 
 
+def get_stale_profiles(repo_url_1, yaml_path_1, repo_url_2, yaml_path_2) -> list[str]:
+    """Load two YAML files from specified GitHub repository URLs and find the stale Profiles.
+
+    Args:
+        repo_url_1: URL of the first GitHub repository.
+        yaml_path_1: Path to the YAML file in the first repository.
+        repo_url_2: URL of the second GitHub repository.
+        yaml_path_2: Path to the YAML file in the second repository.
+
+    Returns:
+        Profiles that are in the first YAML but not in the second.
+    """
+    yaml_1 = load_yaml_from_url(repo_url_1, yaml_path_1)
+    yaml_2 = load_yaml_from_url(repo_url_2, yaml_path_2)
+
+    profiles_1 = {profile["name"] for profile in yaml_1.get("profiles", [])}
+    profiles_2 = {profile["name"] for profile in yaml_2.get("profiles", [])}
+
+    # Find profiles in the first YAML but not in the second
+    difference = profiles_1 - profiles_2
+
+    return list(difference)
+
+
 # All tests will need to modify Profiles and resources inside their namespace
 async def deploy_profiles_controller(ops_test: OpsTest):
     """Deploy the Profiles Controller charm."""
@@ -198,13 +222,21 @@ async def test_list_stale_profiles(ops_test: OpsTest):
     action = await action.wait()
     logger.info("Juju action `sync-now` completed.")
 
-    # List the stale Profiles on the cluster. There should be 1 stale Profile
+    # List the stale Profiles on the cluster.
     logger.info("Testing Juju action `list-stale-profiles`.")
     action = await unit.run_action("list-stale-profiles")
     action = await action.wait()
     assert action.status == "completed"
     logger.info("Juju action `list-stale-profiles` completed.")
     logger.info(f"The results of the list-stale-profiles action are: f{action.results}")
+
+    # Assert that the listed Profiles are all the Profiles that exist on the first PMR
+    # but not on the second PMR
+    stale_profiles = get_stale_profiles(
+        GITHUB_REPOSITORY_URL, GITHUB_PMR_FULL_PATH, GITHUB_REPOSITORY_URL, GITHUB_PMR_SINGLE_PATH
+    )
+    for stale_profile in stale_profiles:
+        assert stale_profile in action.results["stale-profiles"]
 
 
 @pytest.mark.abort_on_fail
