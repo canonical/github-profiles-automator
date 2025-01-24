@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import ops
 import ops.testing
 import pytest
+from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from ops.model import ActiveStatus, BlockedStatus
 
 from charm import GithubProfilesAutomatorCharm
@@ -107,7 +108,7 @@ def test_ssh_key_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]
 
 
 def test_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
-    """Test that _get_pmr_from_yaml() correctly returns a non-empty PMR object."""
+    """Test that pmr_from_yaml correctly returns a non-empty PMR object."""
     # Arrange
     harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
     harness.begin_with_initial_hooks()
@@ -124,12 +125,15 @@ def test_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm
     role: admin
 """
     # Assert
-    pmr = harness.charm._get_pmr_from_yaml()
-    assert pmr is not None
+    try:
+        pmr = harness.charm.pmr_from_yaml
+        assert pmr is not None
+    except ErrorWithStatus:
+        assert False
 
 
 def test_no_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
-    """Test that _get_pmr_from_yaml() blocks if there is no file at `pmr-yaml-path."""
+    """Test that pmr_from_yaml raises the proper error if there is no file at `pmr-yaml-path."""
     # Arrange
     harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
     harness.begin_with_initial_hooks()
@@ -141,13 +145,14 @@ def test_no_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCh
     )
 
     # Assert
-    harness.charm._get_pmr_from_yaml()
-    assert isinstance(harness.charm.model.unit.status, BlockedStatus)
-    assert "Could not load YAML file at path" in harness.charm.model.unit.status.message
+    try:
+        harness.charm.pmr_from_yaml
+    except ErrorWithStatus as e:
+        assert "Could not load YAML file at path" in e.msg
 
 
 def test_wrong_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
-    """Test that _get_pmr_from_yaml() blocks if it cannot create a Profile from the YAML file."""
+    """Test that pmr_from_yaml raises an error if it cannot create a Profile from the YAML file."""
     # Arrange
     harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
     harness.begin_with_initial_hooks()
@@ -158,9 +163,10 @@ def test_wrong_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomato
     harness.charm.container.pull.return_value = """This is an incorrect PMR file."""
 
     # Assert
-    harness.charm._get_pmr_from_yaml()
-    assert isinstance(harness.charm.model.unit.status, BlockedStatus)
-    assert "Could not create Profiles" in harness.charm.model.unit.status.message
+    try:
+        harness.charm.pmr_from_yaml
+    except ErrorWithStatus as e:
+        assert "Could not create Profiles" in e.msg
 
     # Check a YAML file with wrong keys
     # Mock
@@ -170,6 +176,7 @@ def test_wrong_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomato
   wrong-key: wrong-value
 """
     # Assert
-    harness.charm._get_pmr_from_yaml()
-    assert isinstance(harness.charm.model.unit.status, BlockedStatus)
-    assert "Could not create Profiles" in harness.charm.model.unit.status.message
+    try:
+        harness.charm.pmr_from_yaml
+    except ErrorWithStatus as e:
+        assert "Could not create Profiles" in e.msg

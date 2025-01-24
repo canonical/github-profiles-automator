@@ -130,25 +130,23 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         logger.info("Juju action list-stale-profiles has been triggered.")
         event.log("Running list-stale-profiles...")
         event.log("Finding all Profiles that are not present in the PMR.")
-        pmr = self._get_pmr_from_yaml()
-        if not pmr:
-            logger.info("PMR is empty, nothing to do.")
-            return
-        stale_profiles = list_stale_profiles(self.lightkube_client, pmr)
-        stale_profiles_string = ", ".join(stale_profiles.keys())
-        event.set_results({"stale-profiles": stale_profiles_string})
+        try:
+            stale_profiles = list_stale_profiles(self.lightkube_client, self.pmr_from_yaml)
+            stale_profiles_string = ", ".join(stale_profiles.keys())
+            event.set_results({"stale-profiles": stale_profiles_string})
+        except ErrorWithStatus as e:
+            self.unit.status = e.status
 
     def _on_delete_stale_profiles(self, event: ops.ActionEvent):
         """Delete all stale Profiles on the cluster."""
         logger.info("Juju action delete-stale-profiles has been triggered.")
         event.log("Running delete-stale-profiles...")
         event.log("Deleting all Profiles that are not present in the PMR.")
-        pmr = self._get_pmr_from_yaml()
-        if not pmr:
-            logger.info("PMR is empty, nothing to do.")
-            return
-        delete_stale_profiles(self.lightkube_client, pmr)
-        event.log("Stale Profiles have been deleted.")
+        try:
+            delete_stale_profiles(self.lightkube_client, self.pmr_from_yaml)
+            event.log("Stale Profiles have been deleted.")
+        except ErrorWithStatus as e:
+            self.unit.status = e.status
 
     def _on_pebble_custom_notice(self, event: ops.PebbleNoticeEvent):
         """Call sync_now if the custom notice has the specified notice key."""
@@ -161,23 +159,23 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
 
     def _sync_profiles(self):
         """Sync the Kubeflow Profiles based on the YAML file at `pmr-yaml-path`."""
-        pmr = self._get_pmr_from_yaml()
-        if not pmr:
-            logger.info("PMR is empty, nothing to do.")
-            return
-        create_or_update_profiles(self.lightkube_client, pmr)
+        try:
+            create_or_update_profiles(self.lightkube_client, self.pmr_from_yaml)
+        except ErrorWithStatus as e:
+            self.unit.status = e.status
 
-    def _get_pmr_from_yaml(self) -> ProfilesManagementRepresentation | None:
+    @property
+    def pmr_from_yaml(self) -> ProfilesManagementRepresentation:
         """Return the PMR based on the YAML file in `repository` under `pmr-yaml-path`.
 
         If the function fails to load the PMR, it sets the charm's status to Blocked with a status
         message.
 
         Returns:
-            The PMR, or None if the YAML file cannot be loaded
+        The PMR, or None if the YAML file cannot be loaded.
 
         Raises:
-            ErrorWithStatus: If the YAML at pmr-yaml-path could not be loaded
+        ErrorWithStatus: If the YAML at `pmr-yaml-path` could not be loaded.
         """
         pmr_file_path = CLONED_REPO_PATH + str(self.config["pmr-yaml-path"])
         try:
@@ -192,29 +190,29 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 f"Error reading file at path: {str(self.config['pmr-yaml-path'])}. "
                 "The file may not exist or is a directory."
             )
-            self.unit.status = ops.BlockedStatus(
+            raise ErrorWithStatus(
                 f"Could not load YAML file at path {str(self.config['pmr-yaml-path'])}. "
                 "You may need to configure `pmr-yaml-path`. Check the logs for more information.",
+                ops.BlockedStatus,
             )
-            return
         except TypeError as e:
             logger.error(f"TypeError while creating a Profile from a dictionary: {str(e)}")
-            self.unit.status = ops.BlockedStatus(
+            raise ErrorWithStatus(
                 f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}. "
                 "You may need to check the file at `pmr-yaml-path`. "
                 "Check the logs for more information",
+                ops.BlockedStatus,
             )
-            return
         except ValidationError as e:
             logger.error(
                 f"ValidationError while creating a Profile from a dictionary: {e.errors()}"
             )
-            self.unit.status = ops.BlockedStatus(
+            raise ErrorWithStatus(
                 f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}. "
                 "You may need to check the file at `pmr-yaml-path`. "
                 "Check the logs for more information",
+                ops.BlockedStatus,
             )
-            return
 
     @property
     def lightkube_client(self):
