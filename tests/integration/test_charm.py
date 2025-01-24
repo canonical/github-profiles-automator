@@ -156,7 +156,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
 
 @pytest.mark.abort_on_fail
-async def test_update_config(ops_test: OpsTest):
+async def test_pebble_service(ops_test: OpsTest):
     """Test that configuring an existing PMR turns the charm's status to active."""
     # Update the config with the repository URL and the relative path to the PMR yaml
     model = get_model(ops_test)
