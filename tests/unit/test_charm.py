@@ -1,7 +1,7 @@
 # Copyright 2024 Ubuntu
 # See LICENSE file for licensing details.
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import ops
 import ops.testing
@@ -19,7 +19,14 @@ def harness():
     harness.cleanup()
 
 
-# @patch("charm.GithubProfilesAutomatorCharm.lightkube_client")
+@pytest.fixture()
+def mocked_lightkube_client():
+    """Mock the lightkube Client in charm.py."""
+    mocked_lightkube_client = MagicMock()
+    with patch("charm.Client", return_value=mocked_lightkube_client):
+        yield mocked_lightkube_client
+
+
 def test_empty_repository(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
     """Test that setting an empty string for the repository sets the status to Blocked."""
     # Arrange
@@ -55,7 +62,7 @@ def test_not_leader(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
     assert harness.charm.model.unit.status.message.startswith("[leadership-gate]")
 
 
-def test_no_ssh_key(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
+def test_no_ssh_key(harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client):
     """Test that specifying an SSH URL without passing an SSH sets the status to Blocked."""
     # Arrange
     harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
@@ -69,7 +76,7 @@ def test_no_ssh_key(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
     )
 
 
-def test_wrapper_script_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
+def test_wrapper_script_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client):
     """Test that wrapper-script.sh is in the correct place in the workload container."""
     # Arrange
     harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
@@ -86,7 +93,7 @@ def test_wrapper_script_path(harness: ops.testing.Harness[GithubProfilesAutomato
     assert (root / "git-sync-exechook.sh").exists()
 
 
-def test_ssh_key_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
+def test_ssh_key_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client):
     """Test that the SSH key is in the correct place in the workload container."""
     # Arrange
     harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
