@@ -3,11 +3,12 @@
 import logging
 from pathlib import Path
 
-import juju
 import lightkube
 import pytest
 import requests
 import yaml
+from juju.model import Model
+from juju.application import Application
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.profiles_management.helpers import k8s, profiles
@@ -36,7 +37,7 @@ def lightkube_client() -> lightkube.Client:
     return client
 
 
-def get_model(ops_test: OpsTest) -> juju.model.Model:
+def get_model(ops_test: OpsTest) -> Model:
     """Return the Juju model of the current test.
 
     Returns:
@@ -51,7 +52,7 @@ def get_model(ops_test: OpsTest) -> juju.model.Model:
     return model
 
 
-def get_application(ops_test: OpsTest) -> juju.application.Application:
+def get_application(ops_test: OpsTest) -> Application:
     """Return the charm's application in the current test.
 
     Returns:
