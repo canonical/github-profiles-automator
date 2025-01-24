@@ -62,7 +62,9 @@ def test_not_leader(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
     assert harness.charm.model.unit.status.message.startswith("[leadership-gate]")
 
 
-def test_no_ssh_key(harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client):
+def test_no_ssh_key(
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client
+):
     """Test that specifying an SSH URL without passing an SSH sets the status to Blocked."""
     # Arrange
     harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
@@ -76,7 +78,9 @@ def test_no_ssh_key(harness: ops.testing.Harness[GithubProfilesAutomatorCharm], 
     )
 
 
-def test_wrapper_script_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client):
+def test_wrapper_script_path(
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client
+):
     """Test that wrapper-script.sh is in the correct place in the workload container."""
     # Arrange
     harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
@@ -93,7 +97,9 @@ def test_wrapper_script_path(harness: ops.testing.Harness[GithubProfilesAutomato
     assert (root / "git-sync-exechook.sh").exists()
 
 
-def test_ssh_key_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client):
+def test_ssh_key_path(
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client
+):
     """Test that the SSH key is in the correct place in the workload container."""
     # Arrange
     harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
