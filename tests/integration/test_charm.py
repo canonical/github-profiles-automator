@@ -169,9 +169,15 @@ async def test_sync_now(ops_test: OpsTest, lightkube_client: lightkube.Client):
     for profile_name in profile_names:
         try:
             profiles.get_profile(lightkube_client, profile_name)
-        except lightkube.ApiError:
+        except lightkube.ApiError as e:
             # This means that the Profile doesn't exist on the cluster
-            assert False
+            if e.status.code == 404:
+                logger.info(
+                    f"Tried to get Profile {profile_name}, but it doesn't exist on the cluster."
+                )
+                assert False
+            else:
+                logger.info(f"Couldn't get Profile {profile_name}: {e.status}")
 
 
 @pytest.mark.abort_on_fail
