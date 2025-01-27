@@ -37,6 +37,16 @@ jobs:
     - name: Lint code
       run: tox -e lint
 
+  terraform-checks:
+    name: Terraform
+    uses: canonical/charmed-kubeflow-workflows/.github/workflows/terraform-checks.yaml@main
+    with:
+      charm-path: .
+      # The namespace is hardcoded in the upstream project
+      # So the model's name must be kubeflow
+      # See: https://github.com/kubeflow/kubeflow/issues/6136
+      model: kubeflow
+
   unit:
     name: Unit Test
     runs-on: ubuntu-24.04
