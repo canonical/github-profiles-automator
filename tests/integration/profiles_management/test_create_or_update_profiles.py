@@ -22,6 +22,8 @@ log = logging.getLogger(__name__)
 TESTS_YAMLS_PATH = "tests/integration/profiles_management/yamls"
 PROFILE_PATH = TESTS_YAMLS_PATH + "/profile.yaml"
 RESOURCES_PATH = TESTS_YAMLS_PATH + "/contributor.yaml"
+KFP_PRINCIPAL = "cluster.local/ns/kubeflow/sa/ml-pipeline-ui"
+ISTIO_PRINCIPAL = "cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"
 
 
 @pytest.mark.asyncio
@@ -39,7 +41,7 @@ async def test_remove_access_to_stale_profiles(
     pmr = classes.ProfilesManagementRepresentation()
 
     log.info("Running create_or_update_profiles() which should remove access in above Profile.")
-    create_or_update_profiles(lightkube_client, pmr)
+    create_or_update_profiles(lightkube_client, pmr, KFP_PRINCIPAL, ISTIO_PRINCIPAL)
 
     rbs = kfam.list_contributor_rolebindings(lightkube_client, ns)
     assert len(rbs) == 0
@@ -66,7 +68,7 @@ async def test_new_profiles_created(lightkube_client: Client):
             )
         )
 
-    create_or_update_profiles(lightkube_client, pmr)
+    create_or_update_profiles(lightkube_client, pmr, KFP_PRINCIPAL, ISTIO_PRINCIPAL)
 
     log.info("Will check if Profiles were created as expected")
     for user in users:
@@ -104,7 +106,12 @@ async def test_update_resource_quota(lightkube_client: Client):
     )
 
     log.info("Updating Profile CR from expected PMR Profile: %s", pmr_profile)
-    create_or_update_profiles(lightkube_client, ProfilesManagementRepresentation([pmr_profile]))
+    create_or_update_profiles(
+        lightkube_client,
+        ProfilesManagementRepresentation([pmr_profile]),
+        KFP_PRINCIPAL,
+        ISTIO_PRINCIPAL,
+    )
 
     updated_profile = profiles.get_profile(lightkube_client, ns)
     updated_quota = ResourceQuotaSpecModel.model_validate(
@@ -134,7 +141,12 @@ def test_surplus_profile_resources_are_deleted(lightkube_client: Client):
     )
 
     log.info("Deleting superfluous Resources.")
-    create_or_update_profiles(lightkube_client, ProfilesManagementRepresentation([pmr_profile]))
+    create_or_update_profiles(
+        lightkube_client,
+        ProfilesManagementRepresentation([pmr_profile]),
+        KFP_PRINCIPAL,
+        ISTIO_PRINCIPAL,
+    )
 
     rbs = kfam.list_contributor_rolebindings(lightkube_client, ns)
     assert len(rbs) == 0
@@ -162,7 +174,12 @@ def test_existing_profile_resources_are_updated(lightkube_client: Client):
     )
 
     log.info("Updating existing RBs / APs from edit to be admin.")
-    create_or_update_profiles(lightkube_client, ProfilesManagementRepresentation([pmr_profile]))
+    create_or_update_profiles(
+        lightkube_client,
+        ProfilesManagementRepresentation([pmr_profile]),
+        KFP_PRINCIPAL,
+        ISTIO_PRINCIPAL,
+    )
 
     rbs = kfam.list_contributor_rolebindings(lightkube_client, ns)
     assert len(rbs) == 1
@@ -200,7 +217,12 @@ def test_profile_resources_are_created(lightkube_client: Client):
     )
 
     log.info("Creating resources for admin role.")
-    create_or_update_profiles(lightkube_client, ProfilesManagementRepresentation([pmr_profile]))
+    create_or_update_profiles(
+        lightkube_client,
+        ProfilesManagementRepresentation([pmr_profile]),
+        KFP_PRINCIPAL,
+        ISTIO_PRINCIPAL,
+    )
 
     rbs = kfam.list_contributor_rolebindings(lightkube_client, ns)
     assert len(rbs) == 1

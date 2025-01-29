@@ -27,10 +27,6 @@ from profiles_management.pmr.classes import ProfilesManagementRepresentation
 log = logging.getLogger(__name__)
 
 
-KFP_PRINCIPAL = "cluster.local/ns/kubeflow/sa/ml-pipeline-ui"
-ISTIO_PRINCIPAL = "cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"
-
-
 def remove_access_to_stale_profile(client: Client, profile: GenericGlobalResource):
     """Remove access to all users from a Profile.
 
@@ -58,8 +54,8 @@ def remove_access_to_stale_profile(client: Client, profile: GenericGlobalResourc
 def create_or_update_profiles(
     client: Client,
     pmr: ProfilesManagementRepresentation,
-    kfp_ui_principal=KFP_PRINCIPAL,
-    istio_ingressgateway_principal=ISTIO_PRINCIPAL,
+    kfp_ui_principal: str,
+    istio_ingressgateway_principal: str,
 ):
     """Update the cluster to ensure Profiles and contributors are updated accordingly.
 
