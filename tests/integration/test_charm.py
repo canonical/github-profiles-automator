@@ -179,14 +179,11 @@ async def test_sync_now(ops_test: OpsTest, lightkube_client: lightkube.Client):
 @pytest.mark.abort_on_fail
 async def test_list_stale_profiles(ops_test: OpsTest):
     """Test that the list-stale-profiles action shows all stale Profiles."""
-    model = get_model(ops_test)
     app = get_application(ops_test)
 
     # Change the PMR YAML path to point to another sample PMR with a single Profile
     logger.info("Updating the configuration value `pmr-yaml-path` to a different YAML file.")
     await app.set_config({"pmr-yaml-path": GITHUB_PMR_SINGLE_PATH})
-    logger.info("Waiting for the Github Profiles Automator charm to become active.")
-    await model.wait_for_idle(apps=[APP_NAME], status="active", timeout=60 * 10)
 
     # Sync the Profiles on the cluster based on the provided PMR
     logger.info("Running Juju action `sync-now`.")
