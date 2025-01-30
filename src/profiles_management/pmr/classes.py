@@ -91,8 +91,8 @@ class ResourceQuotaSpecModel(BaseModel):
 class UserKind(StrEnum):
     """Class representing the kind of the user as a Profile owner."""
 
-    USER = "user"
-    SERVICE_ACCOUNT = "service-account"
+    USER = "User"
+    SERVICE_ACCOUNT = "ServiceAccount"
 
 
 class ContributorRole(StrEnum):

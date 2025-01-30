@@ -2,6 +2,7 @@ import logging
 
 import pytest
 from lightkube import Client
+from lightkube.resources.rbac_authorization_v1 import RoleBinding
 
 from profiles_management.create_or_update import create_or_update_profiles
 from profiles_management.pmr import classes
@@ -73,7 +74,13 @@ async def test_new_profiles_created(lightkube_client: Client):
         created_profile_quota = classes.ResourceQuotaSpecModel.model_validate(
             created_profile["spec"]["resourceQuotaSpec"]
         )
+
         assert created_profile_quota == expected_quota
+        assert lightkube_client.get(RoleBinding, namespace=user, name="namespaceAdmin")
+        assert lightkube_client.get(
+            kfam.AuthorizationPolicy, namespace=user, name="ns-owner-access-istio"
+        )
+
         profiles.remove_profile(created_profile, lightkube_client)
 
 
