@@ -172,10 +172,11 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         message.
 
         Returns:
-        The PMR, or None if the YAML file cannot be loaded.
+            The PMR, or None if the YAML file cannot be loaded.
 
         Raises:
-        ErrorWithStatus: If the YAML at `pmr-yaml-path` could not be loaded.
+            ErrorWithStatus: If the YAML at `pmr-yaml-path` could not be loaded, if the YAML file
+            has incorrect types, or we if could not create valid Profiles from the YAML file.
         """
         pmr_file_path = CLONED_REPO_PATH + str(self.config["pmr-yaml-path"])
         try:
