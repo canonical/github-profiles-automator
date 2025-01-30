@@ -1,7 +1,7 @@
 profiles:
 - name: ml-engineers
   owner:
-    kind: user
+    kind: User
     name: admin@canonical.com
   resources:
     hard:
@@ -15,7 +15,7 @@ profiles:
     role: view
 - name: data-engineers
   owner:
-    kind: user
+    kind: User
     name: admin@canonical.com
   contributors:
   - name: daniela@canonical.com
