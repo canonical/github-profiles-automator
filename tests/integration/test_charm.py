@@ -71,8 +71,8 @@ def get_stale_profiles(yaml_path_1, yaml_path_2) -> list[str]:
     """Load two YAML files and find the stale Profiles.
 
     Args:
-        yaml_path_1: Path to the YAML file in the first repository.
-        yaml_path_2: Path to the YAML file in the second repository.
+        yaml_path_1: Path to the first YAML file.
+        yaml_path_2: Path to the second YAML file.
 
     Returns:
         Profiles that are in the first YAML but not in the second.
