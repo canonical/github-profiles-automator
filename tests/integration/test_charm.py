@@ -156,7 +156,6 @@ async def test_sync_now(ops_test: OpsTest, lightkube_client: lightkube.Client):
     unit = app.units[0]
     action = await unit.run_action("sync-now")
     action = await action.wait()
-    logger.info("Juju action `sync-now` completed.")
 
     # Load the Profiles from the YAML file
     loaded_yaml = yaml.safe_load(Path(GITHUB_PMR_FULL_PATH).read_text())
@@ -194,14 +193,12 @@ async def test_list_stale_profiles(ops_test: OpsTest):
     unit = app.units[0]
     action = await unit.run_action("sync-now")
     action = await action.wait()
-    logger.info("Juju action `sync-now` completed.")
 
     # List the stale Profiles on the cluster.
     logger.info("Testing Juju action `list-stale-profiles`.")
     action = await unit.run_action("list-stale-profiles")
     action = await action.wait()
     assert action.status == "completed"
-    logger.info("Juju action `list-stale-profiles` completed.")
     logger.info(f"The results of the list-stale-profiles action are: f{action.results}")
 
     # Assert that the listed Profiles are all the Profiles that exist on the first PMR
@@ -221,7 +218,6 @@ async def test_delete_stale_profiles(ops_test: OpsTest, lightkube_client: lightk
     action = await unit.run_action("delete-stale-profiles")
     action = await action.wait()
     assert action.status == "completed"
-    logger.info("Juju action `delete-stale-profiles` completed.")
 
     # There should only be Profiles that exist in the PMR
     loaded_yaml = yaml.safe_load(Path(GITHUB_PMR_SINGLE_PATH).read_text())
