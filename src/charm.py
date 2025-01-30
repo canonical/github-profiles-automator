@@ -114,17 +114,15 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
 
     def _on_event_sync_profiles(self, event: ops.EventBase):
         """Update the Profiles if we can connect to the workload container."""
-        if self.container.can_connect():
-            self._sync_profiles()
+        self._sync_profiles()
 
     def _on_sync_now(self, event: ops.ActionEvent):
         """Log the Juju action and call sync_now()."""
         logger.info("Juju action sync-now has been triggered.")
         event.log("Running sync-now...")
-        if self.container.can_connect():
-            event.log("Updating Profiles based on the provided PMR.")
-            self._sync_profiles()
-            event.log("Profiles have been synced.")
+        event.log("Updating Profiles based on the provided PMR.")
+        self._sync_profiles()
+        event.log("Profiles have been synced.")
 
     def _on_list_stale_profiles(self, event: ops.ActionEvent):
         """List the stale Profiles on the cluster."""
@@ -156,15 +154,15 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             return
 
         logger.info(f"Custom notice {event.notice.key} received, syncing profiles.")
-        if self.container.can_connect():
-            self._sync_profiles()
+        self._sync_profiles()
 
     def _sync_profiles(self):
         """Sync the Kubeflow Profiles based on the YAML file at `pmr-yaml-path`."""
-        try:
-            create_or_update_profiles(self.lightkube_client, self.pmr_from_yaml)
-        except ErrorWithStatus as e:
-            self.unit.status = e.status
+        if self.container.can_connect():
+            try:
+                create_or_update_profiles(self.lightkube_client, self.pmr_from_yaml)
+            except ErrorWithStatus as e:
+                self.unit.status = e.status
 
     @property
     def pmr_from_yaml(self) -> ProfilesManagementRepresentation:
