@@ -104,12 +104,6 @@ async def deploy_profiles_controller(ops_test: OpsTest):
         KUBEFLOW_PROFILES_CHARM, channel=KUBEFLOW_PROFILES_CHANNEL, trust=KUBEFLOW_PROFILES_TRUST
     )
 
-    logger.info("Waiting for the Profile Controller charm to become active.")
-    await ops_test.model.wait_for_idle(
-        apps=[KUBEFLOW_PROFILES_CHARM], status="active", timeout=60 * 20
-    )
-    logger.info("Profile Controller charm is active.")
-
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
@@ -124,13 +118,14 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     model = get_model(ops_test)
 
-    # Deploy the charm and wait for blocked status
+    await deploy_profiles_controller(ops_test)
     logger.info("Deploying the Github Profiles Automator charm.")
     await model.deploy(charm, application_name=APP_NAME, trust=CHARM_TRUST, resources=resources)
-    logger.info("Waiting for the Github Profiles Automator charm to become idle.")
-    await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10)
 
-    await deploy_profiles_controller(ops_test)
+    # Wait until they are idle and have the expected status
+    logger.info("Waiting for all charms to become idle.")
+    await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 20)
+    await model.wait_for_idle(apps=[KUBEFLOW_PROFILES_CHARM], status="active", timeout=60 * 20)
 
 
 @pytest.mark.abort_on_fail
