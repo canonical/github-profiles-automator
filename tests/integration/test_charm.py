@@ -5,7 +5,6 @@ from pathlib import Path
 
 import lightkube
 import pytest
-import requests
 import yaml
 from juju.application import Application
 from juju.model import Model
@@ -68,39 +67,18 @@ def get_application(ops_test: OpsTest) -> Application:
     return app
 
 
-def load_yaml_from_url(repo_url, yaml_path) -> dict:
-    """Load a YAML file at a specified path in a GitHub repository.
-
-    Returns:
-        A dictionary of the YAML at the specified location.
-
-    """
-    # GitHub URL for raw file content
-    raw_file_url = repo_url.replace(".git", f"/{GITHUB_GIT_REVISION}/{yaml_path}").replace(
-        "https://github.com", "https://raw.githubusercontent.com"
-    )
-
-    response = requests.get(raw_file_url)
-    response.raise_for_status()
-
-    yaml_content = yaml.safe_load(response.text)
-    return yaml_content
-
-
-def get_stale_profiles(repo_url_1, yaml_path_1, repo_url_2, yaml_path_2) -> list[str]:
-    """Load two YAML files from specified GitHub repository URLs and find the stale Profiles.
+def get_stale_profiles(yaml_path_1, yaml_path_2) -> list[str]:
+    """Load two YAML files and find the stale Profiles.
 
     Args:
-        repo_url_1: URL of the first GitHub repository.
         yaml_path_1: Path to the YAML file in the first repository.
-        repo_url_2: URL of the second GitHub repository.
         yaml_path_2: Path to the YAML file in the second repository.
 
     Returns:
         Profiles that are in the first YAML but not in the second.
     """
-    yaml_1 = load_yaml_from_url(repo_url_1, yaml_path_1)
-    yaml_2 = load_yaml_from_url(repo_url_2, yaml_path_2)
+    yaml_1 = yaml.safe_load(Path(yaml_path_1).read_text())
+    yaml_2 = yaml.safe_load(Path(yaml_path_2).read_text())
 
     profiles_1 = {profile["name"] for profile in yaml_1.get("profiles", [])}
     profiles_2 = {profile["name"] for profile in yaml_2.get("profiles", [])}
@@ -186,7 +164,7 @@ async def test_sync_now(ops_test: OpsTest, lightkube_client: lightkube.Client):
     logger.info("Juju action `sync-now` completed.")
 
     # Load the Profiles from the YAML file
-    loaded_yaml = load_yaml_from_url(GITHUB_REPOSITORY_URL, GITHUB_PMR_FULL_PATH)
+    loaded_yaml = yaml.safe_load(Path(GITHUB_PMR_FULL_PATH).read_text())
     profile_names = [profile["name"] for profile in loaded_yaml["profiles"]]
 
     # Ensure that the same Profiles also exist on the cluster
@@ -233,9 +211,7 @@ async def test_list_stale_profiles(ops_test: OpsTest):
 
     # Assert that the listed Profiles are all the Profiles that exist on the first PMR
     # but not on the second PMR
-    stale_profiles = get_stale_profiles(
-        GITHUB_REPOSITORY_URL, GITHUB_PMR_FULL_PATH, GITHUB_REPOSITORY_URL, GITHUB_PMR_SINGLE_PATH
-    )
+    stale_profiles = get_stale_profiles(GITHUB_PMR_FULL_PATH, GITHUB_PMR_SINGLE_PATH)
     for stale_profile in stale_profiles:
         assert stale_profile in action.results["stale-profiles"]
 
@@ -253,7 +229,7 @@ async def test_delete_stale_profiles(ops_test: OpsTest, lightkube_client: lightk
     logger.info("Juju action `delete-stale-profiles` completed.")
 
     # There should only be Profiles that exist in the PMR
-    loaded_yaml = load_yaml_from_url(GITHUB_REPOSITORY_URL, GITHUB_PMR_SINGLE_PATH)
+    loaded_yaml = yaml.safe_load(Path(GITHUB_PMR_SINGLE_PATH).read_text())
     profile_names = [profile["name"] for profile in loaded_yaml["profiles"]]
 
     # Iterate on all Profiles in the cluster, and make sure they also exist in the PMR
