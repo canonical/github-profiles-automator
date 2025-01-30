@@ -157,9 +157,10 @@ def test_no_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCh
         "not-found", "The path does not exist"
     )
 
+    # Assert
     with pytest.raises(ErrorWithStatus) as e:
         harness.charm.pmr_from_yaml
-    assert "Could not load YAML file at path" in e.msg
+        assert "Could not load YAML file at path" in e.msg
 
 
 def test_wrong_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
@@ -174,10 +175,9 @@ def test_wrong_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomato
     harness.charm.container.pull.return_value = """This is an incorrect PMR file."""
 
     # Assert
-    try:
+    with pytest.raises(ErrorWithStatus) as e:
         harness.charm.pmr_from_yaml
-    except ErrorWithStatus as e:
-        assert "Could not create Profiles" in e.msg
+        assert "Could not load YAML file at path" in e.msg
 
     # Check a YAML file with wrong keys
     # Mock
@@ -187,7 +187,6 @@ def test_wrong_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomato
   wrong-key: wrong-value
 """
     # Assert
-    try:
+    with pytest.raises(ErrorWithStatus) as e:
         harness.charm.pmr_from_yaml
-    except ErrorWithStatus as e:
-        assert "Could not create Profiles" in e.msg
+        assert "Could not load YAML file at path" in e.msg
