@@ -131,7 +131,7 @@ def test_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm
     harness.charm.container.pull.return_value = """profiles:
 - name: ml-engineers
   owner:
-    kind: user
+    kind: User
     name: admin@canonical.com
   contributors:
   - name: kimonas@canonical.com
