@@ -198,6 +198,7 @@ def test_sync_now_action(
     mock_create_or_update_profiles,
     mock_pmr_from_yaml,
     harness: ops.testing.Harness[GithubProfilesAutomatorCharm],
+    mocked_lightkube_client,
 ):
     """Test that the `sync-now` action can be run and calls the correct function."""
     # Arrange
@@ -218,6 +219,7 @@ def test_list_stale_profiles_action(
     mock_create_or_update_profiles,
     mock_pmr_from_yaml,
     harness: ops.testing.Harness[GithubProfilesAutomatorCharm],
+    mocked_lightkube_client,
 ):
     """Test that the `sync-now` action can be run and calls the correct function."""
     # Arrange
@@ -238,6 +240,7 @@ def test_delete_stale_profiles_action(
     mock_create_or_update_profiles,
     mock_pmr_from_yaml,
     harness: ops.testing.Harness[GithubProfilesAutomatorCharm],
+    mocked_lightkube_client,
 ):
     """Test that the `delete-stale-profiles` action can be run and calls the correct function."""
     # Arrange
