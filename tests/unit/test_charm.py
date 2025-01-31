@@ -1,7 +1,7 @@
 # Copyright 2024 Ubuntu
 # See LICENSE file for licensing details.
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import ops
 import ops.testing
@@ -190,3 +190,63 @@ def test_wrong_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomato
     with pytest.raises(ErrorWithStatus) as e:
         harness.charm.pmr_from_yaml
         assert "Could not load YAML file at path" in e.msg
+
+
+@patch("charm.create_or_update_profiles")
+@patch.object(GithubProfilesAutomatorCharm, "pmr_from_yaml", new_callable=PropertyMock)
+def test_sync_now_action(
+    mock_create_or_update_profiles,
+    mock_pmr_from_yaml,
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm],
+):
+    """Test that the `sync-now` action can be run and calls the correct function."""
+    # Arrange
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin_with_initial_hooks()
+
+    # Mock
+    harness.charm.container.can_connect = MagicMock(return_value=True)
+
+    # Assert
+    harness.run_action("sync-now")
+    mock_create_or_update_profiles.assert_called_once()
+
+
+@patch("charm.list_stale_profiles")
+@patch.object(GithubProfilesAutomatorCharm, "pmr_from_yaml", new_callable=PropertyMock)
+def test_list_stale_profiles_action(
+    mock_create_or_update_profiles,
+    mock_pmr_from_yaml,
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm],
+):
+    """Test that the `sync-now` action can be run and calls the correct function."""
+    # Arrange
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin_with_initial_hooks()
+
+    # Mock
+    harness.charm.container.can_connect = MagicMock(return_value=True)
+
+    # Assert
+    harness.run_action("list-stale-profiles")
+    mock_create_or_update_profiles.assert_called_once()
+
+
+@patch("charm.delete_stale_profiles")
+@patch.object(GithubProfilesAutomatorCharm, "pmr_from_yaml", new_callable=PropertyMock)
+def test_delete_stale_profiles_action(
+    mock_create_or_update_profiles,
+    mock_pmr_from_yaml,
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm],
+):
+    """Test that the `delete-stale-profiles` action can be run and calls the correct function."""
+    # Arrange
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin_with_initial_hooks()
+
+    # Mock
+    harness.charm.container.can_connect = MagicMock(return_value=True)
+
+    # Assert
+    harness.run_action("delete-stale-profiles")
+    mock_create_or_update_profiles.assert_called_once()

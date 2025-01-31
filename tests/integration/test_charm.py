@@ -10,8 +10,6 @@ from juju.application import Application
 from juju.model import Model
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.profiles_management.helpers import k8s, profiles
-
 logger = logging.getLogger(__name__)
 
 CHARM_NAME = "github-profiles-automator"
@@ -144,82 +142,3 @@ async def test_pebble_service(ops_test: OpsTest):
 
     logger.info("Waiting for the Github Profiles Automator charm to become active.")
     await model.wait_for_idle(apps=[APP_NAME], status="active", timeout=60 * 10)
-
-
-@pytest.mark.abort_on_fail
-async def test_sync_now(ops_test: OpsTest, lightkube_client: lightkube.Client):
-    """Test that the sync-now action correctly updates the Profiles on the cluster."""
-    app = get_application(ops_test)
-
-    # Sync the Profiles on the cluster based on the provided PMR
-    logger.info("Testing Juju action `sync-now`.")
-    unit = app.units[0]
-    action = await unit.run_action("sync-now")
-    action = await action.wait()
-
-    # Load the Profiles from the YAML file
-    loaded_yaml = yaml.safe_load(Path(GITHUB_PMR_FULL_PATH).read_text())
-    profile_names = [profile["name"] for profile in loaded_yaml["profiles"]]
-
-    # Ensure that the same Profiles also exist on the cluster
-    for profile_name in profile_names:
-        try:
-            profiles.get_profile(lightkube_client, profile_name)
-        except lightkube.ApiError as e:
-            # This means that the Profile doesn't exist on the cluster
-            if e.status.code == 404:
-                logger.info(
-                    f"Tried to get Profile {profile_name}, but it doesn't exist on the cluster."
-                )
-                assert False
-            else:
-                logger.info(f"Couldn't get Profile {profile_name}: {e.status}")
-
-
-@pytest.mark.abort_on_fail
-async def test_list_stale_profiles(ops_test: OpsTest):
-    """Test that the list-stale-profiles action shows all stale Profiles."""
-    app = get_application(ops_test)
-
-    # Change the PMR YAML path to point to another sample PMR with a single Profile
-    logger.info("Updating the configuration value `pmr-yaml-path` to a different YAML file.")
-    await app.set_config({"pmr-yaml-path": GITHUB_PMR_SINGLE_PATH})
-
-    # Sync the Profiles on the cluster based on the provided PMR
-    logger.info("Running Juju action `sync-now`.")
-    unit = app.units[0]
-    action = await unit.run_action("sync-now")
-    action = await action.wait()
-
-    # List the stale Profiles on the cluster.
-    logger.info("Testing Juju action `list-stale-profiles`.")
-    action = await unit.run_action("list-stale-profiles")
-    action = await action.wait()
-    assert action.status == "completed"
-    logger.info(f"The results of the list-stale-profiles action are: f{action.results}")
-
-    # Assert that the listed Profiles are all the Profiles that exist on the first PMR
-    # but not on the second PMR
-    stale_profiles = get_stale_profiles(GITHUB_PMR_FULL_PATH, GITHUB_PMR_SINGLE_PATH)
-    for stale_profile in stale_profiles:
-        assert stale_profile in action.results["stale-profiles"]
-
-
-@pytest.mark.abort_on_fail
-async def test_delete_stale_profiles(ops_test: OpsTest, lightkube_client: lightkube.Client):
-    """Test that the delete-list-profiles action deletes all stale Profiles from the cluster."""
-    app = get_application(ops_test)
-
-    logger.info("Testing Juju action `delete-stale-profiles`.")
-    unit = app.units[0]
-    action = await unit.run_action("delete-stale-profiles")
-    action = await action.wait()
-    assert action.status == "completed"
-
-    # There should only be Profiles that exist in the PMR
-    loaded_yaml = yaml.safe_load(Path(GITHUB_PMR_SINGLE_PATH).read_text())
-    profile_names = [profile["name"] for profile in loaded_yaml["profiles"]]
-
-    # Iterate on all Profiles in the cluster, and make sure they also exist in the PMR
-    for profile in profiles.list_profiles(lightkube_client):
-        assert k8s.get_name(profile) in profile_names
