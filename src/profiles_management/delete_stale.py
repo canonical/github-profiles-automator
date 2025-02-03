@@ -22,6 +22,9 @@ def delete_stale_profiles(client: Client, pmr: ProfilesManagementRepresentation)
         client: The lightkube client to use.
         pmr: The ProfilesManagementRepresentation expressing what Profiles and contributors
         should exist in the cluster.
+
+    Raises:
+        ApiError: From lightkube, if there was an error.
     """
     stale_profiles = list_stale_profiles(client, pmr)
     log.info("Deleting all stale Profiles.")

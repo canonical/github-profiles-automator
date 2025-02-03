@@ -16,7 +16,7 @@ from charmed_kubeflow_chisme.components import ContainerFileTemplate, LazyContai
 from charmed_kubeflow_chisme.components.charm_reconciler import CharmReconciler
 from charmed_kubeflow_chisme.components.leadership_gate_component import LeadershipGateComponent
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
-from lightkube import Client
+from lightkube import ApiError, Client
 from pydantic import ValidationError
 
 from components.pebble_component import (
@@ -26,6 +26,7 @@ from components.pebble_component import (
 )
 from profiles_management.create_or_update import create_or_update_profiles
 from profiles_management.delete_stale import delete_stale_profiles
+from profiles_management.helpers.kfam import InvalidKfamAnnotationsError
 from profiles_management.list_stale import list_stale_profiles
 from profiles_management.pmr.classes import Profile, ProfilesManagementRepresentation
 
@@ -114,15 +115,21 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
 
     def _on_event_sync_profiles(self, event: ops.EventBase):
         """Update the Profiles if we can connect to the workload container."""
-        self._sync_profiles()
+        try:
+            self._sync_profiles()
+        except (ApiError, InvalidKfamAnnotationsError) as e:
+            logger.error(f"Could not sync profiles, due to the following error: {str(e)}")
 
     def _on_sync_now(self, event: ops.ActionEvent):
         """Log the Juju action and call sync_now()."""
         logger.info("Juju action sync-now has been triggered.")
         event.log("Running sync-now...")
         event.log("Updating Profiles based on the provided PMR.")
-        self._sync_profiles()
-        event.log("Profiles have been synced.")
+        try:
+            self._sync_profiles()
+            event.log("Profiles have been synced.")
+        except (ApiError, InvalidKfamAnnotationsError) as e:
+            event.fail(f"Could not sync profiles, due to the following error: {str(e)}")
 
     def _on_list_stale_profiles(self, event: ops.ActionEvent):
         """List the stale Profiles on the cluster."""
@@ -133,8 +140,10 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             stale_profiles = list_stale_profiles(self.lightkube_client, self.pmr_from_yaml)
             stale_profiles_string = ", ".join(stale_profiles.keys())
             event.set_results({"stale-profiles": stale_profiles_string})
-        except ErrorWithStatus as e:
-            self.unit.status = e.status
+        except ApiError as e:
+            event.fail(
+                f"Could not list stale profiles, due to ApiError with code: {e.status.code}"
+            )
 
     def _on_delete_stale_profiles(self, event: ops.ActionEvent):
         """Delete all stale Profiles on the cluster."""
@@ -144,8 +153,10 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         try:
             delete_stale_profiles(self.lightkube_client, self.pmr_from_yaml)
             event.log("Stale Profiles have been deleted.")
-        except ErrorWithStatus as e:
-            self.unit.status = e.status
+        except ApiError as e:
+            event.fail(
+                f"Could not delete stale profiles, due to ApiError with code: {e.status.code}"
+            )
 
     def _on_pebble_custom_notice(self, event: ops.PebbleNoticeEvent):
         """Call sync_now if the custom notice has the specified notice key."""
@@ -154,15 +165,30 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             return
 
         logger.info(f"Custom notice {event.notice.key} received, syncing profiles.")
-        self._sync_profiles()
+        try:
+            self._sync_profiles()
+        except (ApiError, InvalidKfamAnnotationsError) as e:
+            logger.error(f"Could not sync profiles, due to the following error: {str(e)}")
 
     def _sync_profiles(self):
         """Sync the Kubeflow Profiles based on the YAML file at `pmr-yaml-path`."""
         if self.container.can_connect():
             try:
                 create_or_update_profiles(self.lightkube_client, self.pmr_from_yaml)
-            except ErrorWithStatus as e:
-                self.unit.status = e.status
+            except ApiError as e:
+                if e.status.code == 403:
+                    logger.error(
+                        "ApiError with status code 403 while updating profiles. "
+                        "You may need to deploy to deploy this application with `--trust`."
+                    )
+                else:
+                    logger.error(f"ApiError: {str(e)}")
+                raise
+            except InvalidKfamAnnotationsError:
+                logger.error(
+                    "InvalidKfamAnnotationsError: Profile doesn't have the expected annotations."
+                )
+                raise
 
     @property
     def pmr_from_yaml(self) -> ProfilesManagementRepresentation:
