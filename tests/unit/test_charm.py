@@ -51,6 +51,26 @@ def test_invalid_repository(harness: ops.testing.Harness[GithubProfilesAutomator
     )
 
 
+@pytest.mark.parametrize(
+    "principal_key",
+    [
+        "kfp-ui-principal",
+        "istio-ingressgateway-principal",
+    ],
+)
+def test_empty_kfp_principal(
+    principal_key, harness: ops.testing.Harness[GithubProfilesAutomatorCharm]
+):
+    """Test that setting an empty value for the principal sets the status to Blocked."""
+    # Arrange
+    harness.update_config({principal_key: ""})
+    harness.begin()
+
+    # Assert
+    assert isinstance(harness.model.unit.status, BlockedStatus)
+    assert f"Config `{principal_key}` cannot be empty." in harness.charm.model.unit.status.message
+
+
 def test_not_leader(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
     """Test that the current unit is not the leader."""
     # Arrange

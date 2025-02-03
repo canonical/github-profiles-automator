@@ -19,11 +19,7 @@ from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from lightkube import ApiError, Client
 from pydantic import ValidationError
 
-from components.pebble_component import (
-    GitSyncInputs,
-    GitSyncPebbleService,
-    RepositoryType,
-)
+from components.pebble_component import GitSyncInputs, GitSyncPebbleService, RepositoryType
 from profiles_management.create_or_update import create_or_update_profiles
 from profiles_management.delete_stale import delete_stale_profiles
 from profiles_management.helpers.kfam import InvalidKfamAnnotationsError
@@ -35,6 +31,9 @@ SSH_KEY_DESTINATION_PATH = "/etc/git-secret/ssh"
 SSH_KEY_PERMISSIONS = 0o400
 EXECHOOK_SCRIPT_DESTINATION_PATH = "/git-sync-exechook.sh"
 EXECHOOK_SCRIPT_PERMISSIONS = 0o555
+
+KFP_PRINCIPAL_KEY = "kfp-ui-principal"
+ISTIO_PRINCIPAL_KEY = "istio-ingressgateway-principal"
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +53,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         self.files_to_push = []
 
         try:
+            self._validate_principals_config()
             self._validate_repository_config()
         except ErrorWithStatus as e:
             self.unit.status = e.status
@@ -184,7 +184,12 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         """Sync the Kubeflow Profiles based on the YAML file at `pmr-yaml-path`."""
         if self.container.can_connect():
             try:
-                create_or_update_profiles(self.lightkube_client, self.pmr_from_yaml)
+                create_or_update_profiles(
+                    self.lightkube_client,
+                    self.pmr_from_yaml,
+                    str(self.config.get(KFP_PRINCIPAL_KEY)),
+                    str(self.config.get(ISTIO_PRINCIPAL_KEY)),
+                )
             except ApiError as e:
                 if e.status.code == 403:
                     logger.error(
@@ -320,6 +325,25 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             logger.warning("Charm is Blocked due to incorrect value of `repository`")
             raise ErrorWithStatus(
                 "Config `repository` isn't a valid GitHub URL.", ops.BlockedStatus
+            )
+
+    def _validate_principals_config(self):
+        """Parse the principal strings and raise error if they are empty.
+
+        Raises:
+            ErrorWithStatus: If the config "kfp-ui-principal" or "istio-ingressgateway-principal"
+                             is empty.
+        """
+        if not self.config[KFP_PRINCIPAL_KEY]:
+            logger.warning(f"Charm is Blocked due to empty value of `{KFP_PRINCIPAL_KEY}`.")
+            raise ErrorWithStatus(
+                f"Config `{KFP_PRINCIPAL_KEY}` cannot be empty.", ops.BlockedStatus
+            )
+
+        if not self.config[ISTIO_PRINCIPAL_KEY]:
+            logger.warning(f"Charm is Blocked due to empty value of `{ISTIO_PRINCIPAL_KEY}`.")
+            raise ErrorWithStatus(
+                f"Config `{ISTIO_PRINCIPAL_KEY}` cannot be empty.", ops.BlockedStatus
             )
 
 
