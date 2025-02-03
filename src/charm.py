@@ -119,6 +119,8 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             self._sync_profiles()
         except (ApiError, InvalidKfamAnnotationsError) as e:
             logger.error(f"Could not sync profiles, due to the following error: {str(e)}")
+        except ErrorWithStatus as e:
+            logger.error(f"Could not sync profiles, due to the following error: {e.msg}")
 
     def _on_sync_now(self, event: ops.ActionEvent):
         """Log the Juju action and call sync_now()."""
@@ -130,6 +132,8 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             event.log("Profiles have been synced.")
         except (ApiError, InvalidKfamAnnotationsError) as e:
             event.fail(f"Could not sync profiles, due to the following error: {str(e)}")
+        except ErrorWithStatus as e:
+            event.fail(f"Could not sync profiles, due to the following error: {e.msg}")
 
     def _on_list_stale_profiles(self, event: ops.ActionEvent):
         """List the stale Profiles on the cluster."""
@@ -144,6 +148,8 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             event.fail(
                 f"Could not list stale profiles, due to ApiError with code: {e.status.code}"
             )
+        except ErrorWithStatus as e:
+            event.fail(f"Could not list stale profiles, due to the following error: {e.msg}")
 
     def _on_delete_stale_profiles(self, event: ops.ActionEvent):
         """Delete all stale Profiles on the cluster."""
@@ -157,6 +163,8 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             event.fail(
                 f"Could not delete stale profiles, due to ApiError with code: {e.status.code}"
             )
+        except ErrorWithStatus as e:
+            event.fail(f"Could not delete stale profiles, due to the following error: {e.msg}")
 
     def _on_pebble_custom_notice(self, event: ops.PebbleNoticeEvent):
         """Call sync_now if the custom notice has the specified notice key."""
@@ -169,6 +177,8 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             self._sync_profiles()
         except (ApiError, InvalidKfamAnnotationsError) as e:
             logger.error(f"Could not sync profiles, due to the following error: {str(e)}")
+        except ErrorWithStatus as e:
+            logger.error(f"Could not sync profiles, due to the following error: {e.msg}")
 
     def _sync_profiles(self):
         """Sync the Kubeflow Profiles based on the YAML file at `pmr-yaml-path`."""
@@ -188,6 +198,8 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 logger.error(
                     "InvalidKfamAnnotationsError: Profile doesn't have the expected annotations."
                 )
+                raise
+            except ErrorWithStatus:
                 raise
 
     @property
