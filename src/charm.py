@@ -11,17 +11,26 @@ a Profiles Representation (PMR) that is hosted as a file in a GitHub repo.
 import logging
 
 import ops
+import yaml
 from charmed_kubeflow_chisme.components import ContainerFileTemplate, LazyContainerFileTemplate
 from charmed_kubeflow_chisme.components.charm_reconciler import CharmReconciler
 from charmed_kubeflow_chisme.components.leadership_gate_component import LeadershipGateComponent
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
+from lightkube import ApiError, Client
+from pydantic import ValidationError
 
 from components.pebble_component import (
     GitSyncInputs,
     GitSyncPebbleService,
     RepositoryType,
 )
+from profiles_management.create_or_update import create_or_update_profiles
+from profiles_management.delete_stale import delete_stale_profiles
+from profiles_management.helpers.kfam import InvalidKfamAnnotationsError
+from profiles_management.list_stale import list_stale_profiles
+from profiles_management.pmr.classes import Profile, ProfilesManagementRepresentation
 
+CLONED_REPO_PATH = "/git/cloned-repo/"
 SSH_KEY_DESTINATION_PATH = "/etc/git-secret/ssh"
 SSH_KEY_PERMISSIONS = 0o400
 EXECHOOK_SCRIPT_DESTINATION_PATH = "/git-sync-exechook.sh"
@@ -38,6 +47,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         super().__init__(framework)
         self.pebble_service_name = "git-sync"
         self.container = self.unit.get_container("git-sync")
+
+        # Lightkube client needed for the Profile management functions
+        self.lightkube_client = None
 
         self.files_to_push = []
 
@@ -85,6 +97,173 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
 
         self.charm_reconciler.install_default_event_handlers()
 
+        # Sync when receiving a Pebble custom notice
+        self.framework.observe(
+            self.on[self.pebble_service_name].pebble_custom_notice, self._on_pebble_custom_notice
+        )
+        # Update the Profiles in case `pmr-yaml-path` has been changed
+        self.framework.observe(self.on.config_changed, self._on_event_sync_profiles)
+        # Update the Profiles in case they didn't update in the first sync
+        self.framework.observe(self.on.update_status, self._on_event_sync_profiles)
+
+        # Handlers for all Juju actions
+        self.framework.observe(self.on.sync_now_action, self._on_sync_now)
+        self.framework.observe(self.on.list_stale_profiles_action, self._on_list_stale_profiles)
+        self.framework.observe(
+            self.on.delete_stale_profiles_action, self._on_delete_stale_profiles
+        )
+
+    def _on_event_sync_profiles(self, event: ops.EventBase):
+        """Update the Profiles if we can connect to the workload container."""
+        try:
+            self._sync_profiles()
+        except (ApiError, InvalidKfamAnnotationsError) as e:
+            logger.error(f"Could not sync profiles, due to the following error: {str(e)}")
+        except ErrorWithStatus as e:
+            logger.error(f"Could not sync profiles, due to the following error: {e.msg}")
+
+    def _on_sync_now(self, event: ops.ActionEvent):
+        """Log the Juju action and call sync_now()."""
+        logger.info("Juju action sync-now has been triggered.")
+        event.log("Running sync-now...")
+        event.log("Updating Profiles based on the provided PMR.")
+        try:
+            self._sync_profiles()
+            event.log("Profiles have been synced.")
+        except (ApiError, InvalidKfamAnnotationsError) as e:
+            event.fail(f"Could not sync profiles, due to the following error: {str(e)}")
+        except ErrorWithStatus as e:
+            event.fail(f"Could not sync profiles, due to the following error: {e.msg}")
+
+    def _on_list_stale_profiles(self, event: ops.ActionEvent):
+        """List the stale Profiles on the cluster."""
+        logger.info("Juju action list-stale-profiles has been triggered.")
+        event.log("Running list-stale-profiles...")
+        event.log("Finding all Profiles that are not present in the PMR.")
+        try:
+            stale_profiles = list_stale_profiles(self.lightkube_client, self.pmr_from_yaml)
+            stale_profiles_string = ", ".join(stale_profiles.keys())
+            event.set_results({"stale-profiles": stale_profiles_string})
+        except ApiError as e:
+            event.fail(
+                f"Could not list stale profiles, due to ApiError with code: {e.status.code}"
+            )
+        except ErrorWithStatus as e:
+            event.fail(f"Could not list stale profiles, due to the following error: {e.msg}")
+
+    def _on_delete_stale_profiles(self, event: ops.ActionEvent):
+        """Delete all stale Profiles on the cluster."""
+        logger.info("Juju action delete-stale-profiles has been triggered.")
+        event.log("Running delete-stale-profiles...")
+        event.log("Deleting all Profiles that are not present in the PMR.")
+        try:
+            delete_stale_profiles(self.lightkube_client, self.pmr_from_yaml)
+            event.log("Stale Profiles have been deleted.")
+        except ApiError as e:
+            event.fail(
+                f"Could not delete stale profiles, due to ApiError with code: {e.status.code}"
+            )
+        except ErrorWithStatus as e:
+            event.fail(f"Could not delete stale profiles, due to the following error: {e.msg}")
+
+    def _on_pebble_custom_notice(self, event: ops.PebbleNoticeEvent):
+        """Call sync_now if the custom notice has the specified notice key."""
+        if event.notice.key != "github-profiles-automator.com/sync":
+            logger.info(f"Custom notice {event.notice.key} ignored.")
+            return
+
+        logger.info(f"Custom notice {event.notice.key} received, syncing profiles.")
+        try:
+            self._sync_profiles()
+        except (ApiError, InvalidKfamAnnotationsError) as e:
+            logger.error(f"Could not sync profiles, due to the following error: {str(e)}")
+        except ErrorWithStatus as e:
+            logger.error(f"Could not sync profiles, due to the following error: {e.msg}")
+
+    def _sync_profiles(self):
+        """Sync the Kubeflow Profiles based on the YAML file at `pmr-yaml-path`."""
+        if self.container.can_connect():
+            try:
+                create_or_update_profiles(self.lightkube_client, self.pmr_from_yaml)
+            except ApiError as e:
+                if e.status.code == 403:
+                    logger.error(
+                        "ApiError with status code 403 while updating profiles. "
+                        "You may need to deploy to deploy this application with `--trust`."
+                    )
+                else:
+                    logger.error(f"ApiError: {str(e)}")
+                raise
+            except InvalidKfamAnnotationsError:
+                logger.error(
+                    "InvalidKfamAnnotationsError: Profile doesn't have the expected annotations."
+                )
+                raise
+            except ErrorWithStatus:
+                raise
+
+    @property
+    def pmr_from_yaml(self) -> ProfilesManagementRepresentation:
+        """Return the PMR based on the YAML file in `repository` under `pmr-yaml-path`.
+
+        If the function fails to load the PMR, it sets the charm's status to Blocked with a status
+        message.
+
+        Returns:
+            The PMR, or None if the YAML file cannot be loaded.
+
+        Raises:
+            ErrorWithStatus: If the YAML at `pmr-yaml-path` could not be loaded, if the YAML file
+            has incorrect types, or we if could not create valid Profiles from the YAML file.
+        """
+        pmr_file_path = CLONED_REPO_PATH + str(self.config["pmr-yaml-path"])
+        try:
+            yaml_file = self.container.pull(pmr_file_path)
+            loaded_yaml = yaml.safe_load(yaml_file)
+            pmr = ProfilesManagementRepresentation()
+            for profile_dict in loaded_yaml["profiles"]:
+                pmr.add_profile(Profile.model_validate(profile_dict))
+            return pmr
+        except ops.pebble.PathError:
+            logger.error(
+                f"Error reading file at path: {str(self.config['pmr-yaml-path'])}. "
+                "The file may not exist or is a directory."
+            )
+            raise ErrorWithStatus(
+                f"Could not load YAML file at path {str(self.config['pmr-yaml-path'])}. "
+                "You may need to configure `pmr-yaml-path`. Check the logs for more information.",
+                ops.BlockedStatus,
+            )
+        except TypeError as e:
+            logger.error(f"TypeError while creating a Profile from a dictionary: {str(e)}")
+            raise ErrorWithStatus(
+                f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}. "
+                "You may need to check the file at `pmr-yaml-path`. "
+                "Check the logs for more information",
+                ops.BlockedStatus,
+            )
+        except ValidationError as e:
+            logger.error(
+                f"ValidationError while creating a Profile from a dictionary: {e.errors()}"
+            )
+            raise ErrorWithStatus(
+                f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}. "
+                "You may need to check the file at `pmr-yaml-path`. "
+                "Check the logs for more information",
+                ops.BlockedStatus,
+            )
+
+    @property
+    def lightkube_client(self):
+        """The lightkube client to interact with the Kubernetes cluster."""
+        if not self._lightkube_client:
+            self._lightkube_client = Client(field_manager="profiles-automator-lightkube")
+        return self._lightkube_client
+
+    @lightkube_client.setter
+    def lightkube_client(self, value):
+        self._lightkube_client = value
+
     @property
     def ssh_key(self) -> str | None:
         """Retrieve the SSH key value from the Juju secrets, using the ssh-key-secret-id config.
@@ -105,7 +284,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             ssh_key += "\n\n"
             return ssh_key
         except (ops.SecretNotFoundError, ops.model.ModelError):
-            logger.warning("The SSH key does not exist")
+            logger.warning("An SSH URL has been set but an SSH key has not been provided.")
             return None
 
     def _validate_repository_config(self):
@@ -116,7 +295,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             there is a missing SSH key when needed.
         """
         if self.config["repository"] == "":
-            logger.warning("Charm is Blocked due to empty value of `repository`")
+            logger.warning("Charm is Blocked due to empty value of `repository`.")
             raise ErrorWithStatus("Config `repository` cannot be empty.", ops.BlockedStatus)
 
         if is_ssh_url(str(self.config["repository"])):

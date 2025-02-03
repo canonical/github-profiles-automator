@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import List
+from typing import Iterator, List
 
 import pytest
 from lightkube import Client, codecs
@@ -33,6 +33,18 @@ def get_profile(client: Client, name: str) -> GenericGlobalResource:
         The Profile lightkube object from the cluster.
     """
     return client.get(ProfileLightkube, name=name)
+
+
+def list_profiles(client: Client) -> Iterator[GenericGlobalResource]:
+    """Return all Profile CRs in the cluster.
+
+    Args:
+        client: The lightkube client to use
+
+    Returns:
+        Iterator of Profiles in the cluster.
+    """
+    return client.list(ProfileLightkube)
 
 
 def load_profile_from_file(file_path: str, context: dict = {}) -> codecs.AnyResource:

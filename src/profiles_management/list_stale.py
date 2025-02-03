@@ -28,6 +28,9 @@ def list_stale_profiles(
 
     Returns:
         The profiles that exist in the cluster but are not part of the given PMR.
+
+    Raises:
+        ApiError: From lightkube, if there was an error.
     """
     log.info("Fetching all Profiles in the cluster")
     existing_profiles: dict[str, GenericGlobalResource] = {}

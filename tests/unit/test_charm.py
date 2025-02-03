@@ -1,11 +1,12 @@
 # Copyright 2024 Ubuntu
 # See LICENSE file for licensing details.
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import ops
 import ops.testing
 import pytest
+from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from ops.model import ActiveStatus, BlockedStatus
 
 from charm import GithubProfilesAutomatorCharm
@@ -16,6 +17,14 @@ def harness():
     harness = ops.testing.Harness(GithubProfilesAutomatorCharm)
     yield harness
     harness.cleanup()
+
+
+@pytest.fixture()
+def mocked_lightkube_client():
+    """Mock the lightkube Client in charm.py."""
+    mocked_lightkube_client = MagicMock()
+    with patch("charm.Client", return_value=mocked_lightkube_client):
+        yield mocked_lightkube_client
 
 
 def test_empty_repository(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
@@ -53,7 +62,9 @@ def test_not_leader(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
     assert harness.charm.model.unit.status.message.startswith("[leadership-gate]")
 
 
-def test_no_ssh_key(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
+def test_no_ssh_key(
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client
+):
     """Test that specifying an SSH URL without passing an SSH sets the status to Blocked."""
     # Arrange
     harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
@@ -67,7 +78,9 @@ def test_no_ssh_key(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
     )
 
 
-def test_wrapper_script_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
+def test_wrapper_script_path(
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client
+):
     """Test that wrapper-script.sh is in the correct place in the workload container."""
     # Arrange
     harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
@@ -84,7 +97,9 @@ def test_wrapper_script_path(harness: ops.testing.Harness[GithubProfilesAutomato
     assert (root / "git-sync-exechook.sh").exists()
 
 
-def test_ssh_key_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
+def test_ssh_key_path(
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client
+):
     """Test that the SSH key is in the correct place in the workload container."""
     # Arrange
     harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
@@ -103,3 +118,138 @@ def test_ssh_key_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]
     # Assert
     root = harness.get_filesystem_root("git-sync")
     assert (root / "etc/git-secret/ssh").exists()
+
+
+def test_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
+    """Test that pmr_from_yaml correctly returns a non-empty PMR object."""
+    # Arrange
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin_with_initial_hooks()
+
+    # Mock
+    harness.charm.container = MagicMock()
+    harness.charm.container.pull.return_value = """profiles:
+- name: ml-engineers
+  owner:
+    kind: User
+    name: admin@canonical.com
+  contributors:
+  - name: kimonas@canonical.com
+    role: admin
+"""
+    # Assert
+    try:
+        pmr = harness.charm.pmr_from_yaml
+        assert pmr is not None
+    except ErrorWithStatus:
+        assert False
+
+
+def test_no_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
+    """Test that pmr_from_yaml raises the proper error if there is no file at `pmr-yaml-path."""
+    # Arrange
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin_with_initial_hooks()
+
+    # Mock
+    harness.charm.container = MagicMock()
+    harness.charm.container.pull.side_effect = ops.pebble.PathError(
+        "not-found", "The path does not exist"
+    )
+
+    # Assert
+    with pytest.raises(ErrorWithStatus) as e:
+        harness.charm.pmr_from_yaml
+        assert "Could not load YAML file at path" in e.msg
+
+
+def test_wrong_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
+    """Test that pmr_from_yaml raises an error if it cannot create a Profile from the YAML file."""
+    # Arrange
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin_with_initial_hooks()
+
+    # Check an invalid YAML file
+    # Mock
+    harness.charm.container = MagicMock()
+    harness.charm.container.pull.return_value = """This is an incorrect PMR file."""
+
+    # Assert
+    with pytest.raises(ErrorWithStatus) as e:
+        harness.charm.pmr_from_yaml
+        assert "Could not load YAML file at path" in e.msg
+
+    # Check a YAML file with wrong keys
+    # Mock
+    harness.charm.container = MagicMock()
+    harness.charm.container.pull.return_value = """profiles:
+- name: ml-engineers
+  wrong-key: wrong-value
+"""
+    # Assert
+    with pytest.raises(ErrorWithStatus) as e:
+        harness.charm.pmr_from_yaml
+        assert "Could not load YAML file at path" in e.msg
+
+
+@patch("charm.create_or_update_profiles")
+@patch.object(GithubProfilesAutomatorCharm, "pmr_from_yaml", new_callable=PropertyMock)
+def test_sync_now_action(
+    mock_create_or_update_profiles,
+    mock_pmr_from_yaml,
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm],
+    mocked_lightkube_client,
+):
+    """Test that the `sync-now` action can be run and calls the correct function."""
+    # Arrange
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin_with_initial_hooks()
+
+    # Mock
+    harness.charm.container.can_connect = MagicMock(return_value=True)
+
+    # Assert
+    harness.run_action("sync-now")
+    mock_create_or_update_profiles.assert_called_once()
+
+
+@patch("charm.list_stale_profiles")
+@patch.object(GithubProfilesAutomatorCharm, "pmr_from_yaml", new_callable=PropertyMock)
+def test_list_stale_profiles_action(
+    mock_create_or_update_profiles,
+    mock_pmr_from_yaml,
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm],
+    mocked_lightkube_client,
+):
+    """Test that the `sync-now` action can be run and calls the correct function."""
+    # Arrange
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin_with_initial_hooks()
+
+    # Mock
+    harness.charm.container.can_connect = MagicMock(return_value=True)
+
+    # Assert
+    harness.run_action("list-stale-profiles")
+    mock_create_or_update_profiles.assert_called_once()
+
+
+@patch("charm.delete_stale_profiles")
+@patch.object(GithubProfilesAutomatorCharm, "pmr_from_yaml", new_callable=PropertyMock)
+def test_delete_stale_profiles_action(
+    mock_create_or_update_profiles,
+    mock_pmr_from_yaml,
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm],
+    mocked_lightkube_client,
+):
+    """Test that the `delete-stale-profiles` action can be run and calls the correct function."""
+    # Arrange
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin_with_initial_hooks()
+
+    # Mock
+    harness.charm.container.can_connect = MagicMock(return_value=True)
+
+    # Assert
+    harness.run_action("delete-stale-profiles")
+    mock_create_or_update_profiles.assert_called_once()

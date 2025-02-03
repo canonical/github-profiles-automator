@@ -30,6 +30,9 @@ def list_profiles(client: Client) -> Iterator[GenericGlobalResource]:
 
     Returns:
         Iterator of Profiles in the cluster.
+
+    Raises:
+        ApiError: From lightkube, if there was an error.
     """
     return client.list(ProfileLightkube)
 
