@@ -258,8 +258,8 @@ def test_authorization_policies_with_incorrect_principals_are_updated(lightkube_
         resources={},
     )
 
-    kfp_principal = "kfp-principal"
-    istio_principal = "istio-principal"
+    kfp_principal = "different-kfp-principal"
+    istio_principal = "different-istio-principal"
 
     log.info("Running create_or_update_profiles but with different principals.")
     create_or_update_profiles(
