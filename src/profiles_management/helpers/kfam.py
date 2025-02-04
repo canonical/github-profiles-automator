@@ -429,7 +429,7 @@ def delete_authorization_policies_not_matching_profile_contributors(
     kfp_ui_principal: str,
     istio_ingressgateway_principal: str,
 ) -> None:
-    """Delete AuthorizationPolicies in the cluster that doesn't match Contributors in PMR Profile.
+    """Delete AuthorizationPolicies in the cluster that don't match Contributors in a PMR Profile.
 
     The function will be handling 404 errors, in case the AuthorizationPolicy doesn't exist in the
     cluster.
