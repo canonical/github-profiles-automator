@@ -58,7 +58,7 @@ def test_invalid_repository(harness: ops.testing.Harness[GithubProfilesAutomator
         "istio-ingressgateway-principal",
     ],
 )
-def test_empty_kfp_principal(
+def test_empty_principal_config(
     principal_key, harness: ops.testing.Harness[GithubProfilesAutomatorCharm]
 ):
     """Test that setting an empty value for the principal sets the status to Blocked."""
