@@ -158,7 +158,7 @@ def test_surplus_profile_resources_are_deleted(lightkube_client: Client):
 
 
 def test_existing_profile_resources_are_updated(lightkube_client: Client):
-    """Existing RoleBinding and AuthorizationPolicies for should be updated to "admin"."""
+    """Existing RoleBinding and AuthorizationPolicies should be updated to "admin"."""
     ns = "test-existing-profile-resources-are-updated"
     profile = profiles.apply_profile_and_resources(
         lightkube_client, profile_path=PROFILE_PATH, resources_path=RESOURCES_PATH, namespace=ns
