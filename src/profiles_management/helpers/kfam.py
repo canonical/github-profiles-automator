@@ -238,7 +238,19 @@ def generate_contributor_authorization_policy(
     kfp_ui_principal: str,
     istio_ingressgateway_principal: str,
 ) -> GenericNamespacedResource:
-    """Generate AuthorizatioinPolicy for a PMR Contributor."""
+    """Generate AuthorizatioinPolicy for a PMR Contributor.
+
+    Args:
+        contributor: The PMR Contributor to generate a RoleBinding for.
+        namespace: The namespace to use for the RoleBinding.
+        kfp_ui_principal: The Istio principal of the KFP UI Pod, to put in the
+                          AuthorizationPolicy.
+        istio_ingressgateway_principal: The Istio principal of the Istio IngressGateway Pod
+                                        to put in the AuthorizationPolicy.
+
+    Returns:
+        The generated AuthorizationPolicy lightkube object for the contributor.
+    """
     name_rfc1123 = k8s.to_rfc1123_compliant(f"{contributor.name}-{contributor.role}")
 
     return AuthorizationPolicy.from_dict(
