@@ -54,7 +54,16 @@ async def test_remove_access_to_stale_profiles(
 
 
 @pytest.mark.asyncio
-async def test_new_profiles_created(lightkube_client: Client):
+async def test_new_profiles_are_created(lightkube_client: Client):
+    """Test that Profiles and expected resources are created, from Profile Controller.
+
+    This test will ensure that:
+    1. The resource quota, read from PMR, is valid and Profile Controller can create it.
+    2. The Profile Controller can create the default RoleBinding and AuthorizationPolicy, in
+       the Profile's namespace.
+
+    No contributor resources are tested here.
+    """
     pmr = classes.ProfilesManagementRepresentation()
 
     users = ["noha", "orfeas"]
@@ -157,8 +166,8 @@ def test_surplus_profile_resources_are_deleted(lightkube_client: Client):
     profiles.remove_profile(profile, lightkube_client)
 
 
-def test_existing_profile_resources_are_updated(lightkube_client: Client):
-    """Existing RoleBinding and AuthorizationPolicies should be updated to "admin"."""
+def test_existing_profile_contributor_resources_are_updated(lightkube_client: Client):
+    """Existing contributor RoleBinding and AuthorizationPolicies should be updated to "admin"."""
     ns = "test-existing-profile-resources-are-updated"
     profile = profiles.apply_profile_and_resources(
         lightkube_client, profile_path=PROFILE_PATH, resources_path=RESOURCES_PATH, namespace=ns
@@ -200,8 +209,8 @@ def test_existing_profile_resources_are_updated(lightkube_client: Client):
     profiles.remove_profile(profile, lightkube_client)
 
 
-def test_profile_resources_are_created(lightkube_client: Client):
-    """Existing RBs and APs for "permissions" should be updated to "admin"."""
+def test_profile_contributor_resources_are_created(lightkube_client: Client):
+    """Test contributor RBs and APs defined in PMR are created."""
     ns = "test-profile-resources-are-created"
     profile = profiles.apply_profile_and_resources(
         lightkube_client, profile_path=PROFILE_PATH, namespace=ns
