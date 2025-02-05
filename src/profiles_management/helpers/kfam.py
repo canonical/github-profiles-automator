@@ -374,8 +374,8 @@ def delete_rolebindings_not_matching_profile_contributors(
 ) -> None:
     """Delete RoleBindings in the cluster that doesn't match Contributors in PMR Profile.
 
-    The function will be handling 404 errors, in case the RoleBinding doesn't exist in the
-    cluster.
+    RoleBindings that no longer exist will not raise a 404 error, since underlying delete_many
+    handles this exception.
 
     Args:
         client: The lightkube client to use.
@@ -443,8 +443,8 @@ def delete_authorization_policies_not_matching_profile_contributors(
 ) -> None:
     """Delete AuthorizationPolicies in the cluster that don't match Contributors in a PMR Profile.
 
-    The function will be handling 404 errors, in case the AuthorizationPolicy doesn't exist in the
-    cluster.
+    AuthorizationPolicies that no longer exist will not raise a 404 error, since underlying
+    delete_many handles this exception.
 
     Args:
         client: The lightkube client to use.
