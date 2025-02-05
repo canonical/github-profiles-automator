@@ -13,6 +13,7 @@ from profiles_management.pmr.classes import Contributor, ContributorRole, Profil
 
 log = logging.getLogger(__name__)
 
+
 AuthorizationPolicy = create_namespaced_resource(
     group="security.istio.io",
     version="v1beta1",
@@ -105,10 +106,10 @@ def get_contributor_role(
     return ContributorRole(annotations["role"])
 
 
-def resource_matches_profile_contributor(
+def resource_matches_profile_contributor_name_role(
     resource: RoleBinding | GenericNamespacedResource, profile: Profile
 ) -> bool:
-    """Check if the user and its role in the RoleBinding match the PMR.
+    """Check if the user and its role match a Contributor in the Profile.
 
     Args:
         resource: The AuthorizationPolicy or RoleBinding to check if it matches any
@@ -124,6 +125,77 @@ def resource_matches_profile_contributor(
         return True
 
     return False
+
+
+def get_authorization_policy_principals(ap: GenericNamespacedResource) -> List[str] | None:
+    """Return principals from AuthorizationPolicy or None.
+
+    Args:
+        ap: The AuthorizationPolicy to return the principals from.
+
+    Returns:
+        The list of principals from the AuthorizationPolicy's first rule. If the rule
+        is not structured as expected, then None will be returned.
+    """
+    try:
+        return ap["spec"]["rules"][0]["from"][0]["source"]["principals"]
+    except (IndexError, KeyError):
+        return None
+
+
+def get_authorization_policy_header_user(ap: GenericNamespacedResource) -> str | None:
+    """Return value of kubeflow-userid header that should have namespace access.
+
+    Args:
+        ap: The AuthorizationPolicy to get the user it allows access to, if the header used is
+            "kubeflow-userid".
+
+    Returns:
+        The value of the user given access by the AuthorizationPolicy's first rule. If
+        rule is not structured as expected, then None will be returned.
+    """
+    try:
+        when = ap["spec"]["rules"][0]["when"][0]
+        if when["key"] == "request.headers[kubeflow-userid]":
+            return when["values"][0]
+    except (IndexError, KeyError):
+        return None
+
+
+def authorization_policy_grants_access_to_profile_contributor(
+    ap: GenericNamespacedResource,
+    profile: Profile,
+    kfp_ui_principal: str,
+    istio_ingressgateway_principal: str,
+) -> bool:
+    """Check if AuthorizationPolicy grants permission to a Profile Contributor.
+
+    For a user to have access in the Namespace the following 2 need to be valid:
+    1. The principals in the AuthorizationPolicy are as expected
+    2. The user in the AuthorizationPolicy matches an expected Profile Contributor
+
+    Args:
+        ap: The AuthorizationPolicy to check.
+        profile: The Profile to check if the AuthorizationPolicy refers to one of its
+                 Contributors.
+        kfp_ui_principal: The KFP UI Istio principal to use when checking the AuthorizationPolicy.
+        istio_ingressgateway_principal: The Istio IngressGateway Istio principal to use when
+                                        checking the AuthorizationPolicy.
+
+    Returns:
+        Boolean representing if the AuthorizationPolicy gives access to a Contributor of the
+        Profile to the Profile's namespace.
+    """
+    principals = get_authorization_policy_principals(ap)
+    user = get_authorization_policy_header_user(ap)
+
+    if not user or not principals:
+        return False
+
+    if kfp_ui_principal not in principals or istio_ingressgateway_principal not in principals:
+        return False
+
+    return user in profile._contributors_dict
 
 
 def generate_contributor_rolebinding(contributor: Contributor, namespace: str) -> RoleBinding:
@@ -156,6 +228,63 @@ def generate_contributor_rolebinding(contributor: Contributor, namespace: str) -
             "subjects": [
                 {"apiGroup": "rbac.authorization.k8s.io", "kind": "User", "name": contributor.name}
             ],
+        },
+    )
+
+
+def generate_contributor_authorization_policy(
+    contributor: Contributor,
+    namespace: str,
+    kfp_ui_principal: str,
+    istio_ingressgateway_principal: str,
+) -> GenericNamespacedResource:
+    """Generate AuthorizatioinPolicy for a PMR Contributor.
+
+    Args:
+        contributor: The PMR Contributor to generate a RoleBinding for.
+        namespace: The namespace to use for the RoleBinding.
+        kfp_ui_principal: The Istio principal of the KFP UI Pod, to put in the
+                          AuthorizationPolicy.
+        istio_ingressgateway_principal: The Istio principal of the Istio IngressGateway Pod
+                                        to put in the AuthorizationPolicy.
+
+    Returns:
+        The generated AuthorizationPolicy lightkube object for the contributor.
+    """
+    name_rfc1123 = k8s.to_rfc1123_compliant(f"{contributor.name}-{contributor.role}")
+
+    return AuthorizationPolicy.from_dict(
+        {
+            "metadata": {
+                "name": name_rfc1123,
+                "namespace": namespace,
+                "annotations": {
+                    "user": contributor.name,
+                    "role": contributor.role,
+                },
+            },
+            "spec": {
+                "rules": [
+                    {
+                        "from": [
+                            {
+                                "source": {
+                                    "principals": [
+                                        kfp_ui_principal,
+                                        istio_ingressgateway_principal,
+                                    ]
+                                }
+                            }
+                        ],
+                        "when": [
+                            {
+                                "key": "request.headers[kubeflow-userid]",
+                                "values": [contributor.name],
+                            }
+                        ],
+                    }
+                ],
+            },
         },
     )
 
@@ -245,8 +374,8 @@ def delete_rolebindings_not_matching_profile_contributors(
 ) -> None:
     """Delete RoleBindings in the cluster that doesn't match Contributors in PMR Profile.
 
-    The function will be handling 404 errors, in case the RoleBinding doesn't exist in the
-    cluster.
+    RoleBindings that no longer exist will not raise a 404 error, since underlying delete_many
+    handles this exception.
 
     Args:
         client: The lightkube client to use.
@@ -263,7 +392,7 @@ def delete_rolebindings_not_matching_profile_contributors(
         role_bindings_to_delete = existing_rolebindings
     else:
         for rb in existing_rolebindings:
-            if not resource_matches_profile_contributor(rb, profile):
+            if not resource_matches_profile_contributor_name_role(rb, profile):
                 log.info(
                     "RoleBinding '%s' doesn't belong to Profile. Will delete it.",
                     k8s.get_name(rb),
@@ -304,3 +433,90 @@ def create_rolebindings_for_profile_contributors(
         if contributor.role not in existing_contributor_roles.get(contributor.name, []):
             log.info("Will create RoleBinding for Contributor: %s", contributor)
             client.apply(generate_contributor_rolebinding(contributor, profile.name))
+
+
+def delete_authorization_policies_not_matching_profile_contributors(
+    client: Client,
+    profile: Profile,
+    kfp_ui_principal: str,
+    istio_ingressgateway_principal: str,
+) -> None:
+    """Delete AuthorizationPolicies in the cluster that don't match Contributors in a PMR Profile.
+
+    AuthorizationPolicies that no longer exist will not raise a 404 error, since underlying
+    delete_many handles this exception.
+
+    Args:
+        client: The lightkube client to use.
+        profile: The PMR Profile to create RoleBindings based on its Contributors.
+        kfp_ui_principal: The Istio principal of KFP UI, based on the ServiceAccount, to use
+                          when checking existing AuthorizationPolicies.
+        istio_ingressgateway_principal: The Istio principal of IngressGateway, based on the
+                                        ServiceAccount, to use when checking existing
+                                        AuthorizationPolicies.
+
+    Raises:
+        ApiError: From lightkube if something unexpected occurred while deleting the
+                  resources.
+    """
+    existing_authorization_policies = list_contributor_authorization_policies(client, profile.name)
+    authorization_policies_to_delete = []
+
+    if not profile.contributors:
+        authorization_policies_to_delete = existing_authorization_policies
+    else:
+        for ap in existing_authorization_policies:
+            if not resource_matches_profile_contributor_name_role(
+                ap, profile
+            ) or not authorization_policy_grants_access_to_profile_contributor(
+                ap, profile, kfp_ui_principal, istio_ingressgateway_principal
+            ):
+                log.info(
+                    "AuthorizationPolicy '%s' doesn't belong to Profile. Will delete it.",
+                    k8s.get_name(ap),
+                )
+                authorization_policies_to_delete.append(ap)
+
+    if authorization_policies_to_delete:
+        log.info("Deleting all resources that don't match the PMR.")
+        delete_many(client, authorization_policies_to_delete, logger=log)
+
+
+def create_authorization_policy_for_profile_contributors(
+    client: Client,
+    profile: Profile,
+    kfp_ui_principal: str,
+    istio_ingressgateway_principal: str,
+) -> None:
+    """Create AuthorizationPolicies for all contributors defined in a Profile, in the PMR.
+
+    If an AuthorizationPolicy already exists for the specific Contributor name and role, then
+    no API requests will happen.
+
+    Args:
+        client: The lightkube client to use.
+        profile: The PMR to iterate over its Contributors.
+        kfp_ui_principal: The Istio principal of KFP UI, based on the ServiceAccount, to use
+                          when creating AuthorizationPolicies for Contributors.
+        istio_ingressgateway_principal: The Istio principal of IngressGateway, based on the
+                                        ServiceAccount, to use when creating AuthorizationPolicies
+                                        for Contributors.
+
+    Raises:
+        ApiError: From lightkube if there was an error while trying to create the
+                  RoleBindings.
+    """
+    existing_policies = list_contributor_authorization_policies(client, profile.name)
+    existing_policies_dict = kfam_resources_list_to_roles_dict(existing_policies)
+
+    if not profile.contributors:
+        return
+
+    for contributor in profile.contributors:
+        if contributor.role not in existing_policies_dict.get(contributor.name, []):
+            log.info("Will create AuthorizationPolicy for Contributor: %s", contributor)
+            client.apply(
+                generate_contributor_authorization_policy(
+                    contributor, profile.name, kfp_ui_principal, istio_ingressgateway_principal
+                )
+            )

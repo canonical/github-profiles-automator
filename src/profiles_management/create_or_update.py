@@ -54,6 +54,8 @@ def remove_access_to_stale_profile(client: Client, profile: GenericGlobalResourc
 def create_or_update_profiles(
     client: Client,
     pmr: ProfilesManagementRepresentation,
+    kfp_ui_principal: str,
+    istio_ingressgateway_principal: str,
 ):
     """Update the cluster to ensure Profiles and contributors are updated accordingly.
 
@@ -72,6 +74,11 @@ def create_or_update_profiles(
         client: The lightkube client to use.
         pmr: The ProfilesManagementRepresentation expressing what Profiles and contributors
              should exist in the cluster.
+        kfp_ui_principal: The Istio principal of KFP UI, based on the ServiceAccount, to use
+                          when updating AuthorizationPolicies for Contributors.
+        istio_ingressgateway_principal: The Istio principal of IngressGateway, based on the
+                                        ServiceAccount, to use when updating AuthorizationPolicies
+                                        for Contributors.
 
     Raises:
         ApiError: From lightkube if an error occurred while trying to create or delete
@@ -102,11 +109,24 @@ def create_or_update_profiles(
             log.info("No Profile CR exists for Profile %s, creating it.", profile_name)
             existing_profile = profiles.apply_pmr_profile(client, profile)
 
+        # ResourceQuotas
         log.info("Creating or updating the ResourceQuota for Profile %s", profile_name)
         profiles.update_resource_quota(client, existing_profile, profile)
 
+        # RoleBindings
         log.info("Deleting RoleBindings that don't match Profile: %s", profile_name)
         kfam.delete_rolebindings_not_matching_profile_contributors(client, profile)
 
         log.info("Creating RoleBindings for Profile: %s", profile_name)
         kfam.create_rolebindings_for_profile_contributors(client, profile)
+
+        # AuthorizationPolicies
+        log.info("Deleting AuthorizationPolicies that don't match Profile: %s", profile_name)
+        kfam.delete_authorization_policies_not_matching_profile_contributors(
+            client, profile, kfp_ui_principal, istio_ingressgateway_principal
+        )
+
+        log.info("Creating AuthorizationPolicies for Profile: %s", profile_name)
+        kfam.create_authorization_policy_for_profile_contributors(
+            client, profile, kfp_ui_principal, istio_ingressgateway_principal
+        )
