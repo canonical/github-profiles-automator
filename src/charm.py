@@ -113,14 +113,18 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             self.on.delete_stale_profiles_action, self._on_delete_stale_profiles
         )
 
-    def _on_event_sync_profiles(self, event: ops.EventBase):
+    def _on_event_sync_profiles(self, _: ops.EventBase):
         """Update the Profiles if we can connect to the workload container."""
         try:
             self._sync_profiles()
-        except (ApiError, InvalidKfamAnnotationsError) as e:
-            logger.error(f"Could not sync profiles, due to the following error: {str(e)}")
         except ErrorWithStatus as e:
             logger.error(f"Could not sync profiles, due to the following error: {e.msg}")
+            self.unit.status = e.status
+        except Exception as e:
+            logger.error(f"Could not sync profiles, due to the following error: {str(e)}")
+            self.unit.status = ops.BlockedStatus(
+                "Unexpected error, please look at the charm's logs for more details."
+            )
 
     def _on_sync_now(self, event: ops.ActionEvent):
         """Log the Juju action and call sync_now()."""
@@ -175,10 +179,14 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         logger.info(f"Custom notice {event.notice.key} received, syncing profiles.")
         try:
             self._sync_profiles()
-        except (ApiError, InvalidKfamAnnotationsError) as e:
-            logger.error(f"Could not sync profiles, due to the following error: {str(e)}")
         except ErrorWithStatus as e:
             logger.error(f"Could not sync profiles, due to the following error: {e.msg}")
+            self.unit.status = e.status
+        except Exception as e:
+            logger.error(f"Could not sync profiles, due to the following error: {str(e)}")
+            self.unit.status = ops.BlockedStatus(
+                "Unexpected error, please look at the charm's logs for more details."
+            )
 
     def _sync_profiles(self):
         """Sync the Kubeflow Profiles based on the YAML file at `pmr-yaml-path`."""
@@ -191,14 +199,18 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                     str(self.config.get(ISTIO_PRINCIPAL_KEY)),
                 )
             except ApiError as e:
+                msg = (
+                    "Unexpected error occurred. Please look at the charm's logs for more details."
+                )
                 if e.status.code == 403:
                     logger.error(
                         "ApiError with status code 403 while updating profiles. "
-                        "You may need to deploy to deploy this application with `--trust`."
+                        "You may need to deploy this application with `--trust`."
                     )
-                else:
-                    logger.error(f"ApiError: {str(e)}")
-                raise
+                    msg = "Charm is missing required permissions. Make sure it has --trust."
+
+                logger.error(e)
+                raise ErrorWithStatus(msg, ops.BlockedStatus)
             except InvalidKfamAnnotationsError:
                 logger.error(
                     "InvalidKfamAnnotationsError: Profile doesn't have the expected annotations."
