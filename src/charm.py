@@ -199,7 +199,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                     str(self.config.get(ISTIO_PRINCIPAL_KEY)),
                 )
             except ApiError as e:
-                msg = "An unexpected ApiError occurred. Please look at the charm's logs for more details."
+                msg = (
+                    "Unexpected error occurred. Please look at the charm's logs for more details."
+                )
                 if e.status.code == 403:
                     logger.error(
                         "ApiError with status code 403 while updating profiles. "
