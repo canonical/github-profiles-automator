@@ -122,7 +122,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             self.unit.status = e.status
         except Exception as e:
             logger.error(f"Could not sync profiles, due to the following error: {str(e)}")
-            self.unit.status = ops.BlockedStatus("")
+            self.unit.status = ops.BlockedStatus("Unexpected error, please look at the charm's logs for more details.")
 
     def _on_sync_now(self, event: ops.ActionEvent):
         """Log the Juju action and call sync_now()."""
