@@ -199,7 +199,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 if e.status.code == 403:
                     logger.error(
                         "ApiError with status code 403 while updating profiles. "
-                        "You may need to deploy to deploy this application with `--trust`."
+                        "You may need to deploy this application with `--trust`."
                     )
                     msg = "Charm is missing required permissions. Make sure it has --trust."
 
