@@ -2,7 +2,6 @@
 # See LICENSE file for licensing details.
 
 name: github-profiles-automator
-type: charm
 title: GitHub Profiles Automator charm
 
 summary: A charm for automating the management of Kubeflow Profiles from a GitHub repository
@@ -17,7 +16,6 @@ description: |
 
   It is useful for cluster administrators who want to automatically update
   the profiles on the cluster, based on a single source of truth.
-
 
 type: charm
 platforms:
