@@ -1,0 +1,9 @@
+sync-now:
+  description: |
+    Sync the Kubeflow Profiles on the cluster based on the PMR in `pmr-yaml-path`.
+list-stale-profiles:
+  description: |
+    Return a list of Profiles that exist on the cluster but not in the PMR in `pmr-yaml-path`.
+delete-stale-profiles:
+  description: |
+    Delete all Profiles that exist on the cluster but not in the PMR in `pmr-yaml-path`.

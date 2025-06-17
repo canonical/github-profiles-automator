@@ -1,0 +1,42 @@
+options:
+  repository:
+    default: ""
+    description: |
+      The URL of the repository to fetch. Must be configured for the charm to
+      operate.
+    type: string
+  git-revision:
+    default: "HEAD"
+    description: |
+      The git revision to check out.
+    type: string
+  sync-period:
+    default: 60
+    description: |
+      How long to wait between sync attempts.
+    type: int
+  pmr-yaml-path:
+    default: "pmr.yaml"
+    description: |
+      The relative path to the .yaml file inside the GitHub repository that
+      contains the PMR information
+    type: string
+  ssh-key-secret-id:
+    type: secret
+    description: |
+      A configuration option to store the secret ID needed to access the SSH key for the GitHub
+      repository
+  kfp-ui-principal:
+    default: "cluster.local/ns/kubeflow/sa/ml-pipeline-ui"
+    description: |
+      The Istio Principal for the KFP UI pod, needed for creating and updating the
+      AuthorizationPolicies in the cluster. The value depends on the ServiceAccount
+      of the KFP UI pod.
+    type: string
+  istio-ingressgateway-principal:
+    default: "cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"
+    description: |
+      The Istio Principal for the Istio IngressGatewaty pod, needed for creating and updating the
+      AuthorizationPolicies in the cluster. The value depends on the ServiceAccount of the Istio
+      IngressGateway pod.
+    type: string
