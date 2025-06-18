@@ -1,107 +1,75 @@
-name: github-profiles-automator
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 type: charm
-title: GitHub Profiles Automator charm
-
-summary: A charm for automating the management of Kubeflow Profiles from a GitHub repository
-
-description: |
-  A charm to automatically sync Kubeflow Profiles from information a GitHub repository.
-
-  This charm is responsible for monitoring a file from a GitHub repo that represents
-  which Profiles and Contributors should exist in a cluster. Then, via a reconciliation loop
-  the charm will update the Profiles and RoleBindings and AuthorizationPolicies in the
-  cluster to align with this representation.
-
-  It is useful for cluster administrators who want to automatically update
-  the profiles on the cluster, based on a single source of truth.
-
-base: ubuntu@24.04
 platforms:
-  amd64:
+  ubuntu@24.04:amd64:
 
-config:
-  options:
-    repository:
-      default: ""
-      description: |
-        The URL of the repository to fetch. Must be configured for the charm to
-        operate.
-      type: string
-    git-revision:
-      default: "HEAD"
-      description: |
-        The git revision to check out.
-      type: string
-    sync-period:
-      default: 60
-      description: |
-        How long to wait between sync attempts.
-      type: int
-    pmr-yaml-path:
-      default: "pmr.yaml"
-      description: |
-        The relative path to the .yaml file inside the GitHub repository that
-        contains the PMR information
-      type: string
-    ssh-key-secret-id:
-      type: secret
-      description: |
-        A configuration option to store the secret ID needed to access the SSH key for the GitHub
-        repository
-    kfp-ui-principal:
-      default: "cluster.local/ns/kubeflow/sa/ml-pipeline-ui"
-      description: |
-        The Istio Principal for the KFP UI pod, needed for creating and updating the
-        AuthorizationPolicies in the cluster. The value depends on the ServiceAccount
-        of the KFP UI pod.
-      type: string
-    istio-ingressgateway-principal:
-      default: "cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"
-      description: |
-        The Istio Principal for the Istio IngressGatewaty pod, needed for creating and updating the
-        AuthorizationPolicies in the cluster. The value depends on the ServiceAccount of the Istio
-        IngressGateway pod.
-      type: string
-
-containers:
-  git-sync:
-    resource: git-sync-image
-    mounts:
-      - storage: content-from-git
-        location: /git
-
-resources:
-  git-sync-image:
-    type: oci-image
-    description: OCI image for the 'git-sync' container
-    upstream-source: registry.k8s.io/git-sync/git-sync:v4.4.0
-
-actions:
-  sync-now:
-    description: |
-      Sync the Kubeflow Profiles on the cluster based on the PMR in `pmr-yaml-path`.
-  list-stale-profiles:
-    description: |
-      Return a list of Profiles that exist on the cluster but not in the PMR in `pmr-yaml-path`.
-  delete-stale-profiles:
-    description: |
-      Delete all Profiles that exist on the cluster but not in the PMR in `pmr-yaml-path`.
-
-storage:
-  content-from-git:
-    type: filesystem
-
+# Files implicitly created by charmcraft without a part:
+# - dispatch (https://github.com/canonical/charmcraft/pull/1898)
+# - manifest.yaml
+#   (https://github.com/canonical/charmcraft/blob/9ff19c328e23b50cc06f04e8a5ad4835740badf4/charmcraft/services/package.py#L259)
+# Files implicitly copied/"staged" by charmcraft without a part:
+# - actions.yaml, config.yaml, metadata.yaml
+#   (https://github.com/canonical/charmcraft/blob/9ff19c328e23b50cc06f04e8a5ad4835740badf4/charmcraft/services/package.py#L290-L293
+#   https://github.com/canonical/charmcraft/blob/9ff19c328e23b50cc06f04e8a5ad4835740badf4/charmcraft/services/package.py#L156-L157)
 parts:
-  charm:
-    charm-python-packages: [setuptools]
-    # Until rustc 1.76 is available via apt we can remove the lines below
-    # https://github.com/canonical/charmcraft/issues/1722
-    build-snaps:
-      - rustup
-    build-packages:
-      - libffi-dev
-      - libssl-dev
-      - pkg-config
+  # "python-deps" part name is arbitrary; use for consistency
+  # (but could become a magic constant in the future, similar to "poetry-deps"
+  # https://github.com/canonical/craft-parts/pull/901)
+  python-deps:
+    plugin: nil
     override-build: |
-      rustup default stable
+      # Use environment variable instead of `--break-system-packages` to avoid failing on older
+      # versions of pip that do not recognize `--break-system-packages`
+      # `--user` needed (in addition to `--break-system-packages`) for Ubuntu >=24.04
+      PIP_BREAK_SYSTEM_PACKAGES=true python3 -m pip install --user --upgrade pip==24.3.1  # renovate: charmcraft-pip-latest
+
+  # "charm-python" part name is arbitrary; use for consistency
+  # Avoid using "charm" part name since that has special meaning to charmcraft
+  charm-python:
+    # By default, the `python` plugin creates/stages these directories:
+    # - lib, src
+    #   (https://github.com/canonical/charmcraft/blob/9ff19c328e23b50cc06f04e8a5ad4835740badf4/charmcraft/parts/plugins/_python.py#L79-L81)
+    # - venv
+    #   (https://github.com/canonical/charmcraft/blob/9ff19c328e23b50cc06f04e8a5ad4835740badf4/charmcraft/parts/plugins/_python.py#L100
+    #   https://github.com/canonical/craft-parts/blob/afb0d652eb330b6aaad4f40fbd6e5357d358de47/craft_parts/plugins/base.py#L270)
+    plugin: python
+    source: .
+    after:
+      - python-deps
+    python-requirements: [requirements.txt]
+    build-packages:
+      - libffi-dev  # Needed to build Python dependencies with Rust from source
+      - libssl-dev  # Needed to build Python dependencies with Rust from source
+      - pkg-config  # Needed to build Python dependencies with Rust from source
+    override-build: |
+      # Workaround for https://github.com/canonical/charmcraft/issues/2068
+      # rustup used to install rustc and cargo, which are needed to build Python dependencies with Rust from source
+      if [[ "$CRAFT_PLATFORM" == ubuntu@20.04:* || "$CRAFT_PLATFORM" == ubuntu@22.04:* ]]
+      then
+        snap install rustup --classic
+      else
+        apt-get install rustup -y
+      fi
+
+      # If Ubuntu version < 24.04, rustup was installed from snap instead of from the Ubuntu
+      # archive—which means the rustup version could be updated at any time. Print rustup version
+      # to build log to make changes to the snap's rustup version easier to track
+      rustup --version
+
+      # rpds-py (Python package) >=0.19.0 requires rustc >=1.76, which is not available in the
+      # Ubuntu 22.04 archive. Install rustc and cargo using rustup instead of the Ubuntu archive
+      rustup set profile minimal
+      rustup default 1.83.0  # renovate: charmcraft-rust-latest
+
       craftctl default
+      # Include requirements.txt in *.charm artifact for easier debugging
+      cp requirements.txt "$CRAFT_PART_INSTALL/requirements.txt"
+
+  # "files" part name is arbitrary; use for consistency
+  files:
+    plugin: dump
+    source: .
+    stage:
+      - LICENSE
