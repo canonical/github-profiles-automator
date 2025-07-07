@@ -1,14 +1,6 @@
-# poetry
-[tool.poetry]
-package-mode = false
-
-[tool.poetry.dependencies]
-python = "^3.12"
-charmed_kubeflow_chisme = "^0.4.6"
-jsonschema = "^4.23.0"
-lightkube = "^0.15.7"
-ops = "^2.17.0"
-pydantic = "^2.10.3"
+[project]
+name = "pvcviewer-operator"
+requires-python = ">=3.12,<4.0"
 
 # Testing tools configuration
 [tool.coverage.run]
@@ -64,12 +56,20 @@ target-version = ["py312"]
 profile = "black"
 line_length = 99
 
-# update-requirements
-[tool.poetry.group.update-requirements]
+# dependency management:
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.group.charm]
 optional = true
 
-[tool.poetry.group.update-requirements.dependencies]
-poetry-plugin-export = "^1.8.0"
+[tool.poetry.group.charm.dependencies]
+charmed_kubeflow_chisme = "^0.4.6"
+jsonschema = "^4.23.0"
+lightkube = "^0.15.7"
+ops = "^2.17.0"
+pydantic = "^2.10.3"
 
 # format
 [tool.poetry.group.fmt]
