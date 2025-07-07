@@ -5,7 +5,7 @@ This module includes both
 2. helpers that will handle the different phases of the above logic
 
 The main function exposed is the create_or_update_profile(pmr), which
-will run an update on the whole cluster's Profiles anad Contributors
+will run an update on the whole cluster's Profiles and Contributors
 based on a PMR.
 """
 
