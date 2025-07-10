@@ -21,7 +21,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pipx install tox
+          pip install tox
+          pip install pylint flake8
 
       - name: Run tox tests to create coverage.xml
         run: tox run -e unit
