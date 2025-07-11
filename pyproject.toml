@@ -1,5 +1,5 @@
 [project]
-name = "pvcviewer-operator"
+name = "github-profiles-automator"
 requires-python = ">=3.12,<4.0"
 
 # Testing tools configuration
