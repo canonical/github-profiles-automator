@@ -1,6 +1,7 @@
 resource "juju_application" "github_profiles_automator" {
   charm {
     name     = "github-profiles-automator"
+    base     = var.base
     channel  = var.channel
     revision = var.revision
   }
