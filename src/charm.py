@@ -387,11 +387,6 @@ def is_ssh_url(url: str) -> bool:
     if url.startswith("git@"):
         if ":" not in url or "/" not in url:
             return False
-    elif url.startswith("ssh://git@"):
-        # Must include a path after the host
-        path_part = url[10:]
-        if "/" not in path_part:
-            return False
     else:
         return False
     return True

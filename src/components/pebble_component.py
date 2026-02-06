@@ -69,12 +69,8 @@ class GitSyncPebbleService(PebbleServiceComponent):
             return
         inputs: GitSyncInputs = self._inputs_getter()
         if inputs.REPOSITORY_TYPE == RepositoryType.SSH:
-            if "://" in inputs.REPOSITORY:
-                # Handles ssh://git@provider/user/repo.git
-                host_part = inputs.REPOSITORY.split("://")[-1].split("/")[0]
-            else:
-                # Handles git@provider:user/repo.git
-                host_part = inputs.REPOSITORY.split(":")[0]
+            # Handles git@provider:user/repo.git
+            host_part = inputs.REPOSITORY.split(":")[0]
             return " ".join(
                 [
                     "ssh",
