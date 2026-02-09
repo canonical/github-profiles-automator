@@ -69,12 +69,14 @@ class GitSyncPebbleService(PebbleServiceComponent):
             return
         inputs: GitSyncInputs = self._inputs_getter()
         if inputs.REPOSITORY_TYPE == RepositoryType.SSH:
+            # Handles git@provider:user/repo.git
+            host_part = inputs.REPOSITORY.split(":")[0]
             return " ".join(
                 [
                     "ssh",
                     "-i /etc/git-secret/ssh",
                     "-o StrictHostKeyChecking=no",
-                    "git@github.com;",
+                    f"{host_part};",
                     "[ $? -ne 255 ]",
                 ]
             )

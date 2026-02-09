@@ -308,7 +308,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         """Parse a repository string and raise appropriate errors.
 
         Raises:
-            ErrorWithStatus: If the config `repository` is empty, an invalid GitHub URL, or
+            ErrorWithStatus: If the config `repository` is empty, an invalid repository URL, or
             there is a missing SSH key when needed.
         """
         if self.config["repository"] == "":
@@ -360,37 +360,34 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
 
 
 def is_https_url(url: str) -> bool:
-    """Check if a given string is a valid HTTPS URL for a GitHub repo.
+    """Check if a given string is a valid HTTPS URL.
 
     Args:
         url: The URL to check.
 
     Returns:
-        True if the string is valid HTTPS URL for a GitHub repo, False otherwise.
+        True if the string is valid HTTPS URL, False otherwise.
     """
-    # Check if the URL starts with 'https://github.com'
-    if not url.startswith("https://github.com/"):
+    if not url.startswith("https://"):
         return False
-    # Check if the URL ends with '.git'
     if not url.endswith(".git"):
         return False
     return True
 
 
 def is_ssh_url(url: str) -> bool:
-    """Check if a given string is a valid SSH URL for a GitHub repo.
+    """Check if a given string is a valid SSH URL for a repository.
 
     Args:
         url: The URL to check.
 
     Returns:
-        True if the string is valid SSH URL for a GitHub repo, False otherwise.
+        True if the string is valid SSH URL for a repository, False otherwise.
     """
-    if not url.startswith("git@github.com:"):
-        return False
-    # Get the part after git@github.com
-    path = url.split(":", 1)[-1]
-    if "/" not in path:
+    if url.startswith("git@"):
+        if ":" not in url or "/" not in url:
+            return False
+    else:
         return False
     return True
 
