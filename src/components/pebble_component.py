@@ -8,6 +8,7 @@
 
 import logging
 from enum import Enum
+from pathlib import Path
 
 from charmed_kubeflow_chisme.components.pebble_component import PebbleServiceComponent
 from ops import ActiveStatus, BlockedStatus, StatusBase, WaitingStatus
@@ -31,6 +32,9 @@ class GitSyncInputs(BaseModel):
     REPOSITORY: str
     REPOSITORY_TYPE: RepositoryType
     SYNC_PERIOD: int
+    SSL_CA_FILE: Path
+    SSL_CERTIFICATE_FILE: Path
+    SSL_KEY_FILE: Path
 
 
 class GitSyncPebbleService(PebbleServiceComponent):
@@ -92,6 +96,27 @@ class GitSyncPebbleService(PebbleServiceComponent):
                 ]
             )
 
+    def generate_git_config_string(self) -> str | None:
+        """Generate the git config string to be used in the git-sync command.
+
+        Returns:
+            A string of the generic git config option with the appropriate values.
+        """
+        if self._inputs_getter is None:
+            return None
+
+        inputs: GitSyncInputs = self._inputs_getter()
+
+        config_string = ""
+        if inputs.SSL_CA_FILE:
+            config_string += f'http.sslCAInfo:"{inputs.SSL_CA_FILE}",'
+        if inputs.SSL_CERTIFICATE_FILE:
+            config_string += f'http.sslCert:"{inputs.SSL_CERTIFICATE_FILE}",'
+        if inputs.SSL_KEY_FILE:
+            config_string += f'http.sslKey:"{inputs.SSL_KEY_FILE}",'
+
+        return config_string if config_string else None
+
     def get_layer(self) -> Layer:
         """Configure the Pebble layer for this component.
 
@@ -105,22 +130,26 @@ class GitSyncPebbleService(PebbleServiceComponent):
             raise ValueError(f"{self.name}: inputs are not correctly provided")
         inputs: GitSyncInputs = self._inputs_getter()
 
-        command = " ".join(
-            [
-                "/git-sync",
-                f"--repo={inputs.REPOSITORY}",
-                f"--ref={inputs.GIT_REVISION}",
-                "--depth=1",
-                f"--period={inputs.SYNC_PERIOD}s",
-                "--link=cloned-repo",
-                "--root=/git",
-                "--ssh-known-hosts=false",
-                "--verbose=9",
-                "--exechook-command=/git-sync-exechook.sh",
-            ]
-        )
+        command_parts = [
+            "/git-sync",
+            f"--repo={inputs.REPOSITORY}",
+            f"--ref={inputs.GIT_REVISION}",
+            "--depth=1",
+            f"--period={inputs.SYNC_PERIOD}s",
+            "--link=cloned-repo",
+            "--root=/git",
+            "--ssh-known-hosts=false",
+            "--verbose=9",
+            "--exechook-command=/git-sync-exechook.sh",
+        ]
+
+        git_config_string = self.generate_git_config_string()
+        if git_config_string:
+            logger.info(f"Adding git config string: {git_config_string}")
+            command_parts.append(f"--git-config={git_config_string}")
 
         check_command = self.generate_check_command()
+        command = " ".join(command_parts)
 
         checks = {
             "check-repository": CheckDict(

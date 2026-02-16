@@ -8,7 +8,10 @@ This charm is responsible for updating a Kubeflow cluster's Profiles and contrib
 a Profiles Representation (PMR) that is hosted as a file in a GitHub repo.
 """
 
+import base64
+import binascii
 import logging
+from pathlib import Path
 
 import ops
 import yaml
@@ -28,7 +31,9 @@ from profiles_management.pmr.classes import Profile, ProfilesManagementRepresent
 
 CLONED_REPO_PATH = "/git/cloned-repo/"
 SSH_KEY_DESTINATION_PATH = "/etc/git-secret/ssh"
+SSL_DATA_DIR = Path("/etc/git-secret/ssl/")
 SSH_KEY_PERMISSIONS = 0o400
+SSL_DATA_PERMISSIONS = 0o400
 EXECHOOK_SCRIPT_DESTINATION_PATH = "/git-sync-exechook.sh"
 EXECHOOK_SCRIPT_PERMISSIONS = 0o555
 
@@ -55,6 +60,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         try:
             self._validate_principals_config()
             self._validate_repository_config()
+            self._validate_ssl_config()
         except ErrorWithStatus as e:
             self.unit.status = e.status
             return
@@ -90,6 +96,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                     REPOSITORY=str(self.config["repository"]),
                     REPOSITORY_TYPE=self.repository_type,
                     SYNC_PERIOD=int(self.config["sync-period"]),
+                    SSL_CA_FILE=SSL_DATA_DIR / "ssl-ca",
+                    SSL_CERTIFICATE_FILE=SSL_DATA_DIR / "ssl-certificate",
+                    SSL_KEY_FILE=SSL_DATA_DIR / "ssl-key",
                 ),
             ),
             depends_on=[self.leadership_gate],
@@ -304,6 +313,27 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             logger.warning("An SSH URL has been set but an SSH key has not been provided.")
             return None
 
+    @property
+    def ssl_data(self) -> dict:
+        """Retrieve the SSL information from the Juju secrets, using the ssl-data-secret-id config.
+
+        Returns:
+            The SSL information as a dictionary, or an empty dictionary if the Juju secret doesn't exist or the config
+            hasn't been set.
+        """
+        ssl_data_secret_id = str(self.config.get("ssl-data-secret-id"))
+        ssl_dict = {}
+
+        if ssl_data_secret_id:
+            try:
+                ssl_data_secret = self.model.get_secret(id=ssl_data_secret_id)
+                for item in ["ssl-ca", "ssl-certificate", "ssl-key"]:
+                    ssl_dict[item] = str(ssl_data_secret.get_content(refresh=True)[item])
+            except (ops.SecretNotFoundError, ops.model.ModelError):
+                pass
+
+        return ssl_dict
+
     def _validate_repository_config(self):
         """Parse a repository string and raise appropriate errors.
 
@@ -357,6 +387,36 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             raise ErrorWithStatus(
                 f"Config `{ISTIO_PRINCIPAL_KEY}` cannot be empty.", ops.BlockedStatus
             )
+
+    def _validate_ssl_config(self):
+        """Check the provided SSL data of the git server and push it to the workload container.
+
+        Raises:
+            ErrorWithStatus: If the ssl data cannot be decoded.
+        """
+        if self.ssl_data:
+            # If there is SSL data, we push it to the workload container
+            # This is because git only accepts file paths for SSL validation
+            # Additionally, only check provided values as SSL data is optional
+            # and providing empty data shouldn't cause errors.
+
+            for key, value in self.ssl_data.items():
+                try:
+                    decoded_value = base64.b64encode(base64.b64decode(value)).decode()
+                except binascii.Error:
+                    logger.error(f"Error decoding SSL data for key {key}.")
+                    raise ErrorWithStatus(
+                        f"Failed to base64 decode SSL data for key `{key}`.", ops.BlockedStatus
+                    )
+
+                self.files_to_push.append(
+                    LazyContainerFileTemplate(
+                        source_template=decoded_value,
+                        destination_path=SSL_DATA_DIR / key,
+                        permissions=SSL_DATA_PERMISSIONS,
+                    )
+                )
+            return
 
 
 def is_https_url(url: str) -> bool:
