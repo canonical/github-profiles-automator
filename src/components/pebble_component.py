@@ -32,9 +32,9 @@ class GitSyncInputs(BaseModel):
     REPOSITORY: str
     REPOSITORY_TYPE: RepositoryType
     SYNC_PERIOD: int
-    SSL_CA_FILE: Path
-    SSL_CERTIFICATE_FILE: Path
-    SSL_KEY_FILE: Path
+    SSL_CA_FILE: Path | None
+    SSL_CERTIFICATE_FILE: Path | None
+    SSL_KEY_FILE: Path | None
 
 
 class GitSyncPebbleService(PebbleServiceComponent):

@@ -84,6 +84,14 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             )
         )
 
+        ssl_ca_file = None
+        ssl_certificate_file = None
+        ssl_key_file = None
+        if current_ssl_data := self.ssl_data:
+            ssl_ca_file = SSL_DATA_DIR / "ssl-ca" if current_ssl_data.get("ssl-ca") else None
+            ssl_certificate_file = SSL_DATA_DIR / "ssl-certificate" if current_ssl_data.get("ssl-certificate") else None
+            ssl_key_file = SSL_DATA_DIR / "ssl-key" if current_ssl_data.get("ssl-key") else None
+
         self.pebble_service_container = self.charm_reconciler.add(
             component=GitSyncPebbleService(
                 charm=self,
@@ -96,9 +104,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                     REPOSITORY=str(self.config["repository"]),
                     REPOSITORY_TYPE=self.repository_type,
                     SYNC_PERIOD=int(self.config["sync-period"]),
-                    SSL_CA_FILE=SSL_DATA_DIR / "ssl-ca",
-                    SSL_CERTIFICATE_FILE=SSL_DATA_DIR / "ssl-certificate",
-                    SSL_KEY_FILE=SSL_DATA_DIR / "ssl-key",
+                    SSL_CA_FILE=ssl_ca_file,
+                    SSL_CERTIFICATE_FILE=ssl_certificate_file,
+                    SSL_KEY_FILE=ssl_key_file,
                 ),
             ),
             depends_on=[self.leadership_gate],
@@ -331,7 +339,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 for item in ["ssl-ca", "ssl-certificate", "ssl-key"]:
                     ssl_dict[item] = str(ssl_data_secret.get_content(refresh=True)[item])
             except (ops.SecretNotFoundError, ops.model.ModelError):
-                # Do nothing if the secret does not exist
+                logger.warning("Either the ssl-data-secret-id secret does not exist or access to it is not allowed.")
+            except KeyError:
+                # Ignore missing keys as they are optional
                 pass
 
         return ssl_dict
@@ -404,8 +414,8 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
 
             for key, value in self.ssl_data.items():
                 try:
-                    decoded_value = base64.b64encode(base64.b64decode(value)).decode()
-                except binascii.Error:
+                    decoded_value = base64.b64decode(value).decode("utf-8")
+                except (binascii.Error, UnicodeDecodeError):
                     logger.error(f"Error decoding SSL data for key {key}.")
                     raise ErrorWithStatus(
                         f"Failed to base64 decode SSL data for key `{key}`.", ops.BlockedStatus
