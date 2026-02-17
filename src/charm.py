@@ -314,22 +314,24 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             return None
 
     @property
-    def ssl_data(self) -> dict:
+    def ssl_data(self) -> dict | None:
         """Retrieve the SSL information from the Juju secrets, using the ssl-data-secret-id config.
 
         Returns:
-            The SSL information as a dictionary, or an empty dictionary if the Juju secret doesn't exist or the config
+            The SSL information as a dictionary, or None if the Juju secret doesn't exist or the config
             hasn't been set.
         """
         ssl_data_secret_id = str(self.config.get("ssl-data-secret-id"))
-        ssl_dict = {}
+        ssl_dict = None
 
         if ssl_data_secret_id:
             try:
                 ssl_data_secret = self.model.get_secret(id=ssl_data_secret_id)
+                ssl_dict = {}
                 for item in ["ssl-ca", "ssl-certificate", "ssl-key"]:
                     ssl_dict[item] = str(ssl_data_secret.get_content(refresh=True)[item])
             except (ops.SecretNotFoundError, ops.model.ModelError):
+                # Do nothing if the secret does not exist
                 pass
 
         return ssl_dict
