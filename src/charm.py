@@ -236,6 +236,15 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             except ErrorWithStatus:
                 raise
 
+    def _log_container_state(self):
+        """Helper to capture pebble logs only on failure."""
+        try:
+            process = self.container.exec(['/charm/bin/pebble', 'logs'], timeout=60, combine_stderr=True)
+            output = process.wait_output()
+            logger.error(f"Container logs at time of failure:\n{output}")
+        except Exception as e:
+            logger.error(f"Could not retrieve container logs: {e}")
+
     @property
     def pmr_from_yaml(self) -> ProfilesManagementRepresentation:
         """Return the PMR based on the YAML file in `repository` under `pmr-yaml-path`.
@@ -263,6 +272,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 f"Error reading file at path: {str(self.config['pmr-yaml-path'])}. "
                 "The file may not exist or is a directory."
             )
+            self._log_container_state()
             raise ErrorWithStatus(
                 f"Could not load YAML file at path {str(self.config['pmr-yaml-path'])}. "
                 "You may need to configure `pmr-yaml-path`. Check the logs for more information.",
@@ -270,6 +280,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             )
         except TypeError as e:
             logger.error(f"TypeError while creating a Profile from a dictionary: {str(e)}")
+            self._log_container_state()
             raise ErrorWithStatus(
                 f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}. "
                 "You may need to check the file at `pmr-yaml-path`. "
@@ -280,6 +291,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             logger.error(
                 f"ValidationError while creating a Profile from a dictionary: {e.errors()}"
             )
+            self._log_container_state()
             raise ErrorWithStatus(
                 f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}. "
                 "You may need to check the file at `pmr-yaml-path`. "
