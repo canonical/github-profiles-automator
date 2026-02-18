@@ -89,7 +89,11 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         ssl_key_file = None
         if current_ssl_data := self.ssl_data:
             ssl_ca_file = SSL_DATA_DIR / "ssl-ca" if current_ssl_data.get("ssl-ca") else None
-            ssl_certificate_file = SSL_DATA_DIR / "ssl-certificate" if current_ssl_data.get("ssl-certificate") else None
+            ssl_certificate_file = (
+                SSL_DATA_DIR / "ssl-certificate"
+                if current_ssl_data.get("ssl-certificate")
+                else None
+            )
             ssl_key_file = SSL_DATA_DIR / "ssl-key" if current_ssl_data.get("ssl-key") else None
 
         self.pebble_service_container = self.charm_reconciler.add(
@@ -237,9 +241,11 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 raise
 
     def _log_container_state(self):
-        """Helper to capture pebble logs only on failure."""
+        """Capture and log pebble logs of the workload container."""
         try:
-            process = self.container.exec(['/charm/bin/pebble', 'logs'], timeout=60, combine_stderr=True)
+            process = self.container.exec(
+                ["/charm/bin/pebble", "logs"], timeout=60, combine_stderr=True
+            )
             output = process.wait_output()
             logger.error(f"Container logs at time of failure:\n{output}")
         except Exception as e:
@@ -338,8 +344,8 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         """Retrieve the SSL information from the Juju secrets, using the ssl-data-secret-id config.
 
         Returns:
-            The SSL information as a dictionary, or None if the Juju secret doesn't exist or the config
-            hasn't been set.
+            The SSL information as a dictionary, or None if the Juju secret doesn't exist or the
+            config hasn't been set.
         """
         ssl_data_secret_id = str(self.config.get("ssl-data-secret-id"))
         ssl_dict = None
@@ -351,7 +357,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 for item in ["ssl-ca", "ssl-certificate", "ssl-key"]:
                     ssl_dict[item] = str(ssl_data_secret.get_content(refresh=True)[item])
             except (ops.SecretNotFoundError, ops.model.ModelError):
-                logger.warning("Either the ssl-data-secret-id secret does not exist or access to it is not allowed.")
+                logger.warning(
+                    "The ssl-data-secret-id secret does not exist or access to it is not allowed."
+                )
             except KeyError:
                 # Ignore missing keys as they are optional
                 pass
