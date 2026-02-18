@@ -142,41 +142,12 @@ def test_ssh_key_path(
     assert (root / "etc/git-secret/ssh").exists()
 
 
-def test_ssl_data_ca_only_path(
-    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client
-):
-    """Test that SSL data is in the correct place in the workload container."""
-    # Arrange
-    harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
-    ssh_secret_content = {"ssh-key": "Sample SSH key"}
-    ssh_secret_id = harness.add_user_secret(ssh_secret_content)
-    harness.grant_secret(ssh_secret_id, "github-profiles-automator")
-    harness.update_config({"ssh-key-secret-id": ssh_secret_id})
-
-    secret_content = {"ssl-ca": as_base64("Sample CA")}
-    secret_id = harness.add_user_secret(secret_content)
-    harness.grant_secret(secret_id, "github-profiles-automator")
-    harness.update_config({"ssl-data-secret-id": secret_id})
-    harness.begin_with_initial_hooks()
-
-    # Mock:
-    # * leadership_gate to be active and executed
-    harness.charm.leadership_gate.get_status = MagicMock(return_value=ActiveStatus())
-    # Update the config
-    harness.update_config({"sync-period": 60})
-
-    # Assert
-    root = harness.get_filesystem_root("git-sync")
-    ssl_item_path = root / "etc/git-secret/ssl/ssl-ca"
-    assert ssl_item_path.exists()
-    assert ssl_item_path.read_text() == base64.b64decode(secret_content["ssl-ca"]).decode("utf-8")
-
-    assert not (root / "etc/git-secret/ssl/ssl-cert").exists()
-    assert not (root / "etc/git-secret/ssl/ssl-key").exists()
-
-
+@pytest.mark.parametrize(
+    "ssl_items",
+    [(["ssl-ca"]), (["ssl-certificate", "ssl-key"]), (["ssl-ca", "ssl-certificate", "ssl-key"])],
+)
 def test_ssl_data_path(
-    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client, ssl_items
 ):
     """Test that SSL data is in the correct place in the workload container."""
     # Arrange
@@ -186,7 +157,6 @@ def test_ssl_data_path(
     harness.grant_secret(ssh_secret_id, "github-profiles-automator")
     harness.update_config({"ssh-key-secret-id": ssh_secret_id})
 
-    ssl_items = ["ssl-ca", "ssl-certificate", "ssl-key"]
     secret_content = {item: as_base64(f"Sample: {item}") for item in ssl_items}
     secret_id = harness.add_user_secret(secret_content)
     harness.grant_secret(secret_id, "github-profiles-automator")
@@ -205,6 +175,36 @@ def test_ssl_data_path(
         ssl_item_path = root / f"etc/git-secret/ssl/{item}"
         assert ssl_item_path.exists()
         assert ssl_item_path.read_text() == base64.b64decode(secret_content[item]).decode("utf-8")
+
+
+@pytest.mark.parametrize("ssl_items", [(["ssl-certificate"]), (["ssl-key"])])
+def test_missing_ssl_config(
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client, ssl_items
+):
+    """Test that passing an SSL certificate without a key (and vice versa) blocks the charm."""
+    # Arrange
+    harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
+    ssh_secret_content = {"ssh-key": "Sample SSH key"}
+    ssh_secret_id = harness.add_user_secret(ssh_secret_content)
+    harness.grant_secret(ssh_secret_id, "github-profiles-automator")
+    harness.update_config({"ssh-key-secret-id": ssh_secret_id})
+
+    secret_content = {item: as_base64(f"Sample: {item}") for item in ssl_items}
+    secret_id = harness.add_user_secret(secret_content)
+    harness.grant_secret(secret_id, "github-profiles-automator")
+    harness.update_config({"ssl-data-secret-id": secret_id})
+    harness.begin_with_initial_hooks()
+
+    # Mock:
+    # Update the config
+    harness.update_config({"sync-period": 60})
+
+    # Assert
+    assert isinstance(harness.model.unit.status, BlockedStatus)
+    assert (
+        "Both ssl-certificate and ssl-key must be provided together."
+        in harness.charm.model.unit.status.message
+    )
 
 
 def test_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):

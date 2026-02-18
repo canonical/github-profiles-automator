@@ -353,9 +353,12 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         if ssl_data_secret_id:
             try:
                 ssl_data_secret = self.model.get_secret(id=ssl_data_secret_id)
-                ssl_dict = {}
-                for item in ["ssl-ca", "ssl-certificate", "ssl-key"]:
-                    ssl_dict[item] = str(ssl_data_secret.get_content(refresh=True)[item])
+                secret_content = ssl_data_secret.get_content(refresh=True)
+                ssl_dict = {
+                    key: str(secret_content[key])
+                    for key in ["ssl-ca", "ssl-certificate", "ssl-key"]
+                    if key in secret_content
+                }
             except (ops.SecretNotFoundError, ops.model.ModelError):
                 logger.warning(
                     "The ssl-data-secret-id secret does not exist or access to it is not allowed."
@@ -427,11 +430,18 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             ErrorWithStatus: If the ssl data cannot be decoded.
         """
         if self.ssl_data:
-            # If there is SSL data, we push it to the workload container
+            # Ensure that an SSL certificate cannot exist without an SSL key
+            # and vice versa
+            if bool(self.ssl_data.get("ssl-certificate")) != bool(self.ssl_data.get("ssl-key")):
+                raise ErrorWithStatus(
+                    "Both ssl-certificate and ssl-key must be provided together.",
+                    ops.BlockedStatus,
+                )
+
+            # If there is valid SSL data, we push it to the workload container
             # This is because git only accepts file paths for SSL validation
             # Additionally, only check provided values as SSL data is optional
             # and providing empty data shouldn't cause errors.
-
             for key, value in self.ssl_data.items():
                 try:
                     decoded_value = base64.b64decode(value).decode("utf-8")
@@ -476,12 +486,7 @@ def is_ssh_url(url: str) -> bool:
     Returns:
         True if the string is valid SSH URL for a repository, False otherwise.
     """
-    if url.startswith("git@"):
-        if ":" not in url or "/" not in url:
-            return False
-    else:
-        return False
-    return True
+    return url.startswith("git@") and ":" in url and "/" in url
 
 
 if __name__ == "__main__":
