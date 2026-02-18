@@ -1,12 +1,14 @@
 # Copyright 2024 Ubuntu
 # See LICENSE file for licensing details.
 
+import base64
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import ops
 import ops.testing
 import pytest
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
+from helpers import as_base64
 from ops.model import ActiveStatus, BlockedStatus
 
 from charm import GithubProfilesAutomatorCharm
@@ -146,7 +148,12 @@ def test_ssl_data_ca_only_path(
     """Test that SSL data is in the correct place in the workload container."""
     # Arrange
     harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
-    secret_content = {"ssl-ca": "Sample ssl-ca"}
+    ssh_secret_content = {"ssh-key": "Sample SSH key"}
+    ssh_secret_id = harness.add_user_secret(ssh_secret_content)
+    harness.grant_secret(ssh_secret_id, "github-profiles-automator")
+    harness.update_config({"ssh-key-secret-id": ssh_secret_id})
+
+    secret_content = {"ssl-ca": as_base64("Sample CA")}
     secret_id = harness.add_user_secret(secret_content)
     harness.grant_secret(secret_id, "github-profiles-automator")
     harness.update_config({"ssl-data-secret-id": secret_id})
@@ -162,7 +169,7 @@ def test_ssl_data_ca_only_path(
     root = harness.get_filesystem_root("git-sync")
     ssl_item_path = root / "etc/git-secret/ssl/ssl-ca"
     assert ssl_item_path.exists()
-    assert ssl_item_path.read_text() == secret_content["ssl-ca"]
+    assert ssl_item_path.read_text() == base64.b64decode(secret_content["ssl-ca"]).decode("utf-8")
 
     assert not (root / "etc/git-secret/ssl/ssl-cert").exists()
     assert not (root / "etc/git-secret/ssl/ssl-key").exists()
@@ -174,8 +181,13 @@ def test_ssl_data_path(
     """Test that SSL data is in the correct place in the workload container."""
     # Arrange
     harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
-    ssl_items = ["ssl-ca", "ssl-cert", "ssl-key"]
-    secret_content = {item: f"Sample {item}" for item in ssl_items}
+    ssh_secret_content = {"ssh-key": "Sample SSH key"}
+    ssh_secret_id = harness.add_user_secret(ssh_secret_content)
+    harness.grant_secret(ssh_secret_id, "github-profiles-automator")
+    harness.update_config({"ssh-key-secret-id": ssh_secret_id})
+
+    ssl_items = ["ssl-ca", "ssl-certificate", "ssl-key"]
+    secret_content = {item: as_base64(f"Sample: {item}") for item in ssl_items}
     secret_id = harness.add_user_secret(secret_content)
     harness.grant_secret(secret_id, "github-profiles-automator")
     harness.update_config({"ssl-data-secret-id": secret_id})
@@ -192,7 +204,7 @@ def test_ssl_data_path(
     for item in ssl_items:
         ssl_item_path = root / f"etc/git-secret/ssl/{item}"
         assert ssl_item_path.exists()
-        assert ssl_item_path.read_text() == secret_content[item]
+        assert ssl_item_path.read_text() == base64.b64decode(secret_content[item]).decode("utf-8")
 
 
 def test_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
