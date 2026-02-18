@@ -363,9 +363,6 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 logger.warning(
                     "The ssl-data-secret-id secret does not exist or access to it is not allowed."
                 )
-            except KeyError:
-                # Ignore missing keys as they are optional
-                pass
 
         return ssl_dict
 
