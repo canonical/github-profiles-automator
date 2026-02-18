@@ -140,6 +140,61 @@ def test_ssh_key_path(
     assert (root / "etc/git-secret/ssh").exists()
 
 
+def test_ssl_data_ca_only_path(
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client
+):
+    """Test that SSL data is in the correct place in the workload container."""
+    # Arrange
+    harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
+    secret_content = {"ssl-ca": "Sample ssl-ca"}
+    secret_id = harness.add_user_secret(secret_content)
+    harness.grant_secret(secret_id, "github-profiles-automator")
+    harness.update_config({"ssl-data-secret-id": secret_id})
+    harness.begin_with_initial_hooks()
+
+    # Mock:
+    # * leadership_gate to be active and executed
+    harness.charm.leadership_gate.get_status = MagicMock(return_value=ActiveStatus())
+    # Update the config
+    harness.update_config({"sync-period": 60})
+
+    # Assert
+    root = harness.get_filesystem_root("git-sync")
+    ssl_item_path = root / "etc/git-secret/ssl/ssl-ca"
+    assert ssl_item_path.exists()
+    assert ssl_item_path.read_text() == secret_content["ssl-ca"]
+
+    assert not (root / "etc/git-secret/ssl/ssl-cert").exists()
+    assert not (root / "etc/git-secret/ssl/ssl-key").exists()
+
+
+def test_ssl_data_path(
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client
+):
+    """Test that SSL data is in the correct place in the workload container."""
+    # Arrange
+    harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
+    ssl_items = ["ssl-ca", "ssl-cert", "ssl-key"]
+    secret_content = {item: f"Sample {item}" for item in ssl_items}
+    secret_id = harness.add_user_secret(secret_content)
+    harness.grant_secret(secret_id, "github-profiles-automator")
+    harness.update_config({"ssl-data-secret-id": secret_id})
+    harness.begin_with_initial_hooks()
+
+    # Mock:
+    # * leadership_gate to be active and executed
+    harness.charm.leadership_gate.get_status = MagicMock(return_value=ActiveStatus())
+    # Update the config
+    harness.update_config({"sync-period": 60})
+
+    # Assert
+    root = harness.get_filesystem_root("git-sync")
+    for item in ssl_items:
+        ssl_item_path = root / f"etc/git-secret/ssl/{item}"
+        assert ssl_item_path.exists()
+        assert ssl_item_path.read_text() == secret_content[item]
+
+
 def test_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
     """Test that pmr_from_yaml correctly returns a non-empty PMR object."""
     # Arrange
