@@ -40,3 +40,9 @@ options:
       AuthorizationPolicies in the cluster. The value depends on the ServiceAccount of the Istio
       IngressGateway pod.
     type: string
+  ssl-data-secret-id:
+    default: ""
+    description: |
+      ID of the juju secret that holds certificate data of the git server,
+      in YAML format with keys `ssl-ca`, `ssl-certificate`, and `ssl-key`.
+    type: secret

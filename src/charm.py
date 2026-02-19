@@ -8,7 +8,10 @@ This charm is responsible for updating a Kubeflow cluster's Profiles and contrib
 a Profiles Representation (PMR) that is hosted as a file in a GitHub repo.
 """
 
+import base64
+import binascii
 import logging
+from pathlib import Path
 
 import ops
 import yaml
@@ -28,7 +31,9 @@ from profiles_management.pmr.classes import Profile, ProfilesManagementRepresent
 
 CLONED_REPO_PATH = "/git/cloned-repo/"
 SSH_KEY_DESTINATION_PATH = "/etc/git-secret/ssh"
+SSL_DATA_DIR = Path("/etc/git-secret/ssl/")
 SSH_KEY_PERMISSIONS = 0o400
+SSL_DATA_PERMISSIONS = 0o400
 EXECHOOK_SCRIPT_DESTINATION_PATH = "/git-sync-exechook.sh"
 EXECHOOK_SCRIPT_PERMISSIONS = 0o555
 
@@ -55,6 +60,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         try:
             self._validate_principals_config()
             self._validate_repository_config()
+            self._validate_ssl_config()
         except ErrorWithStatus as e:
             self.unit.status = e.status
             return
@@ -78,6 +84,18 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             )
         )
 
+        ssl_ca_file = None
+        ssl_certificate_file = None
+        ssl_key_file = None
+        if current_ssl_data := self.ssl_data:
+            ssl_ca_file = SSL_DATA_DIR / "ssl-ca" if current_ssl_data.get("ssl-ca") else None
+            ssl_certificate_file = (
+                SSL_DATA_DIR / "ssl-certificate"
+                if current_ssl_data.get("ssl-certificate")
+                else None
+            )
+            ssl_key_file = SSL_DATA_DIR / "ssl-key" if current_ssl_data.get("ssl-key") else None
+
         self.pebble_service_container = self.charm_reconciler.add(
             component=GitSyncPebbleService(
                 charm=self,
@@ -90,6 +108,9 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                     REPOSITORY=str(self.config["repository"]),
                     REPOSITORY_TYPE=self.repository_type,
                     SYNC_PERIOD=int(self.config["sync-period"]),
+                    SSL_CA_FILE=ssl_ca_file,
+                    SSL_CERTIFICATE_FILE=ssl_certificate_file,
+                    SSL_KEY_FILE=ssl_key_file,
                 ),
             ),
             depends_on=[self.leadership_gate],
@@ -219,6 +240,17 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             except ErrorWithStatus:
                 raise
 
+    def _log_container_state(self):
+        """Capture and log pebble logs of the workload container."""
+        try:
+            process = self.container.exec(
+                ["/charm/bin/pebble", "logs"], timeout=60, combine_stderr=True
+            )
+            output = process.wait_output()
+            logger.error(f"Container logs at time of failure:\n{output}")
+        except Exception as e:
+            logger.error(f"Could not retrieve container logs: {e}")
+
     @property
     def pmr_from_yaml(self) -> ProfilesManagementRepresentation:
         """Return the PMR based on the YAML file in `repository` under `pmr-yaml-path`.
@@ -246,6 +278,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 f"Error reading file at path: {str(self.config['pmr-yaml-path'])}. "
                 "The file may not exist or is a directory."
             )
+            self._log_container_state()
             raise ErrorWithStatus(
                 f"Could not load YAML file at path {str(self.config['pmr-yaml-path'])}. "
                 "You may need to configure `pmr-yaml-path`. Check the logs for more information.",
@@ -253,6 +286,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             )
         except TypeError as e:
             logger.error(f"TypeError while creating a Profile from a dictionary: {str(e)}")
+            self._log_container_state()
             raise ErrorWithStatus(
                 f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}. "
                 "You may need to check the file at `pmr-yaml-path`. "
@@ -263,6 +297,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             logger.error(
                 f"ValidationError while creating a Profile from a dictionary: {e.errors()}"
             )
+            self._log_container_state()
             raise ErrorWithStatus(
                 f"Could not create Profiles from {str(self.config['pmr-yaml-path'])}. "
                 "You may need to check the file at `pmr-yaml-path`. "
@@ -303,6 +338,33 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         except (ops.SecretNotFoundError, ops.model.ModelError):
             logger.warning("An SSH URL has been set but an SSH key has not been provided.")
             return None
+
+    @property
+    def ssl_data(self) -> dict | None:
+        """Retrieve the SSL information from the Juju secrets, using the ssl-data-secret-id config.
+
+        Returns:
+            The SSL information as a dictionary, or None if the Juju secret doesn't exist or the
+            config hasn't been set.
+        """
+        ssl_data_secret_id = str(self.config.get("ssl-data-secret-id"))
+        ssl_dict = None
+
+        if ssl_data_secret_id:
+            try:
+                ssl_data_secret = self.model.get_secret(id=ssl_data_secret_id)
+                secret_content = ssl_data_secret.get_content(refresh=True)
+                ssl_dict = {
+                    key: str(secret_content[key])
+                    for key in ["ssl-ca", "ssl-certificate", "ssl-key"]
+                    if key in secret_content
+                }
+            except (ops.SecretNotFoundError, ops.model.ModelError):
+                logger.warning(
+                    "The ssl-data-secret-id secret does not exist or access to it is not allowed."
+                )
+
+        return ssl_dict
 
     def _validate_repository_config(self):
         """Parse a repository string and raise appropriate errors.
@@ -358,6 +420,43 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 f"Config `{ISTIO_PRINCIPAL_KEY}` cannot be empty.", ops.BlockedStatus
             )
 
+    def _validate_ssl_config(self):
+        """Check the provided SSL data of the git server and push it to the workload container.
+
+        Raises:
+            ErrorWithStatus: If the ssl data cannot be decoded.
+        """
+        if self.ssl_data:
+            # Ensure that an SSL certificate cannot exist without an SSL key
+            # and vice versa
+            if bool(self.ssl_data.get("ssl-certificate")) != bool(self.ssl_data.get("ssl-key")):
+                raise ErrorWithStatus(
+                    "Both ssl-certificate and ssl-key must be provided together.",
+                    ops.BlockedStatus,
+                )
+
+            # If there is valid SSL data, we push it to the workload container
+            # This is because git only accepts file paths for SSL validation
+            # Additionally, only check provided values as SSL data is optional
+            # and providing empty data shouldn't cause errors.
+            for key, value in self.ssl_data.items():
+                try:
+                    decoded_value = base64.b64decode(value).decode("utf-8")
+                except (binascii.Error, UnicodeDecodeError):
+                    logger.error(f"Error decoding SSL data for key {key}.")
+                    raise ErrorWithStatus(
+                        f"Failed to base64 decode SSL data for key `{key}`.", ops.BlockedStatus
+                    )
+
+                self.files_to_push.append(
+                    LazyContainerFileTemplate(
+                        source_template=decoded_value,
+                        destination_path=SSL_DATA_DIR / key,
+                        permissions=SSL_DATA_PERMISSIONS,
+                    )
+                )
+            return
+
 
 def is_https_url(url: str) -> bool:
     """Check if a given string is a valid HTTPS URL.
@@ -384,12 +483,7 @@ def is_ssh_url(url: str) -> bool:
     Returns:
         True if the string is valid SSH URL for a repository, False otherwise.
     """
-    if url.startswith("git@"):
-        if ":" not in url or "/" not in url:
-            return False
-    else:
-        return False
-    return True
+    return url.startswith("git@") and ":" in url and "/" in url
 
 
 if __name__ == "__main__":
