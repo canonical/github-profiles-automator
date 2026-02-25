@@ -9,10 +9,13 @@ from lightkube.generic_resource import (
     GenericNamespacedResource,
     create_global_resource,
 )
+from lightkube.resources.core_v1 import Namespace, ResourceQuota
+from lightkube.resources.rbac_authorization_v1 import RoleBinding
 from lightkube.types import PatchType
 
 from profiles_management.helpers import k8s
-from profiles_management.helpers.k8s import ensure_namespace_exists
+from profiles_management.helpers.k8s import ensure_namespace_exists, ensure_resource_exists
+from profiles_management.helpers.kfam import AuthorizationPolicy, delete_owner_resources
 from profiles_management.pmr import classes
 
 ProfileLightkube = create_global_resource(
@@ -115,6 +118,48 @@ def apply_pmr_profile(
         ensure_namespace_exists(profile.name, client)
 
     return applied_profile
+
+
+def update_owners(
+    client: Client, existing_profile: GenericGlobalResource, pmr_profile: classes.Profile
+):
+    """Update the owner in the existing Profile, based on Profile defined in PMR.
+
+    If the ResourceQuota in the existing Profile and the PMR Profile are the same, then no
+    update will happen.
+
+    Args:
+        client: The lightkube client to use.
+        existing_profile: The existing Profile lightkube object in the cluster.
+        pmr_profile: The new PMR representation of the profile.
+    """
+    current_owner = existing_profile["spec"]["owner"]["name"]
+    if current_owner == pmr_profile.owner.name:
+        return
+    log.info("New owner detected for Profile: %s", pmr_profile.name)
+
+    # First, patch the profile
+    patch = {"spec": {"owner": {"name": pmr_profile.owner.name}}}
+    client.patch(ProfileLightkube, name=pmr_profile.name, obj=patch, patch_type=PatchType.MERGE)
+    log.info("Successfully patched owner for Profile: %s", pmr_profile.name)
+
+    # Second, patch the namespace
+    patch = {"metadata": {"annotations": {"owner": pmr_profile.owner.name}}}
+    client.patch(res=Namespace, name=pmr_profile.name, obj=patch, patch_type=PatchType.MERGE)
+    log.info("Successfully patched namespace for Profile: %s", pmr_profile.name)
+
+    # Third, delete owner resources so they are recreated by the profiles controller
+    # They have to be created before they are deleted
+    ensure_resource_exists(RoleBinding, "namespaceAdmin", pmr_profile.name, client)
+    ensure_resource_exists(AuthorizationPolicy, "ns-owner-access-istio", pmr_profile.name, client)
+    ensure_resource_exists(ResourceQuota, "kf-resource-quota", pmr_profile.name, client)
+    delete_owner_resources(client, pmr_profile.name)
+    log.info("Successfully deleted owner resources for Profile: %s", pmr_profile.name)
+
+    # Finally, ensure that the resources have been recreated
+    ensure_resource_exists(RoleBinding, "namespaceAdmin", pmr_profile.name, client)
+    ensure_resource_exists(AuthorizationPolicy, "ns-owner-access-istio", pmr_profile.name, client)
+    ensure_resource_exists(ResourceQuota, "kf-resource-quota", pmr_profile.name, client)
 
 
 def update_resource_quota(

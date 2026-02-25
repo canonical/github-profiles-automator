@@ -18,7 +18,7 @@ AuthorizationPolicy = create_namespaced_resource(
 codecs.resource_registry.register(AuthorizationPolicy)
 
 
-def has_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> bool:
+def has_valid_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> bool:
     """Check if resource has "user" and "role" KFAM annotations.
 
     Args:
@@ -73,7 +73,27 @@ def list_contributor_rolebindings(client: Client, namespace="") -> List[RoleBind
     return [
         rb
         for rb in role_bindings
-        if has_kfam_annotations(rb) and not resource_is_for_profile_owner(rb)
+        if has_valid_kfam_annotations(rb) and not resource_is_for_profile_owner(rb)
+    ]
+
+
+def list_owner_rolebindings(client: Client, namespace="") -> List[RoleBinding]:
+    """Return a list of the KFAM RoleBindings for the Profile owner.
+
+    Args:
+        client: The lightkube client to use
+        namespace: The namespace to list contributors from. For all namespaces
+                   you can pass an empty string "".
+
+    Returns:
+        A list of RoleBindings that are used from KFAM for the Profile owner.
+    """
+    role_bindings = client.list(RoleBinding, namespace=namespace)
+
+    return [
+        rb
+        for rb in role_bindings
+        if has_valid_kfam_annotations(rb) and resource_is_for_profile_owner(rb)
     ]
 
 
@@ -101,5 +121,29 @@ def list_contributor_authorization_policies(
     return [
         ap
         for ap in authorization_policies
-        if has_kfam_annotations(ap) and not resource_is_for_profile_owner(ap)
+        if has_valid_kfam_annotations(ap) and not resource_is_for_profile_owner(ap)
+    ]
+
+
+def list_owner_authorization_policies(
+    client: Client, namespace=""
+) -> List[GenericNamespacedResource]:
+    """Return a list of KFAM AuthorizationPolicies for the Profile owner.
+
+    This should return a single AuthorizationPolicy with name `ns-owner-access-istio`
+
+    Args:
+        client: The lightkube client to use
+        namespace: The namespace to list contributors from. For all namespaces
+                   you can use "" value.
+
+    Returns:
+        A list of AuthorizationPolicies that are used from KFAM for contributors.
+    """
+    authorization_policies = client.list(AuthorizationPolicy, namespace=namespace)
+
+    return [
+        ap
+        for ap in authorization_policies
+        if has_valid_kfam_annotations(ap) and resource_is_for_profile_owner(ap)
     ]

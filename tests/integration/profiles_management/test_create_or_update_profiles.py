@@ -166,6 +166,68 @@ def test_surplus_profile_resources_are_deleted(lightkube_client: Client):
     profiles.remove_profile(profile, lightkube_client)
 
 
+def test_new_profile_owner_resources_are_updated(lightkube_client: Client):
+    """Test that changing the owner of a profile updates all resources.
+
+    The following resources should be updated:
+    - Profile
+    - RoleBinding with name `namespaceAdmin`
+    - AuthorizationPolicy with name `ns-owner-access-istio`
+    - ResourceQuota with name ``
+    """
+    profile_name = "test-profile"
+    # Create a new profile
+    pmr = classes.ProfilesManagementRepresentation()
+    quota = classes.ResourceQuotaSpecModel.model_validate({"hard": {"cpu": "1"}})
+    old_owner = "noha"
+    pmr.add_profile(
+        classes.Profile(
+            name=profile_name,
+            owner=classes.Owner(name=old_owner, kind=classes.UserKind.USER),
+            resources=quota,
+        )
+    )
+    create_or_update_profiles(lightkube_client, pmr, KFP_PRINCIPAL, ISTIO_PRINCIPAL)
+
+    updated_profile = profiles.get_profile(lightkube_client, profile_name)
+    assert updated_profile.spec["owner"]["name"] == old_owner
+
+    # Change the owner of the currently existing profile
+    # and the resource quota corresponding to it
+    new_owner = "orfeas"
+    new_quota = classes.ResourceQuotaSpecModel.model_validate({"hard": {"cpu": "2"}})
+    pmr.profiles[profile_name].owner = Owner(name=new_owner, kind=UserKind.USER)
+    pmr.profiles[profile_name].resources = new_quota
+    create_or_update_profiles(lightkube_client, pmr, KFP_PRINCIPAL, ISTIO_PRINCIPAL)
+
+    log.info("Will check if the profile owner was changed as expected")
+    updated_profile = profiles.get_profile(lightkube_client, profile_name)
+    assert updated_profile.spec["owner"]["name"] == new_owner
+
+    log.info("Will check that RoleBinding, AuthorizationPolicy, and ResourceQuota are updated.")
+    rbs = kfam.list_owner_rolebindings(lightkube_client, profile_name)
+    assert len(rbs) == 1
+    assert rbs[0].metadata is not None
+    assert rbs[0].metadata.annotations is not None
+    assert rbs[0].metadata.annotations["user"] == new_owner
+    assert rbs[0].metadata.annotations["role"] == "admin"
+    assert rbs[0].roleRef.name == "kubeflow-admin"
+
+    aps = kfam.list_owner_authorization_policies(lightkube_client, profile_name)
+    assert len(aps) == 1
+    assert aps[0].metadata is not None
+    assert aps[0].metadata.annotations is not None
+    assert aps[0].metadata.annotations["user"] == new_owner
+    assert aps[0].metadata.annotations["role"] == "admin"
+
+    created_profile_quota = classes.ResourceQuotaSpecModel.model_validate(
+        updated_profile["spec"]["resourceQuotaSpec"]
+    )
+    assert created_profile_quota == new_quota
+
+    profiles.remove_profile(updated_profile, lightkube_client)
+
+
 def test_existing_profile_contributor_resources_are_updated(lightkube_client: Client):
     """Existing contributor RoleBinding and AuthorizationPolicies should be updated to "admin"."""
     ns = "test-existing-profile-resources-are-updated"

@@ -6,6 +6,7 @@ from typing import List
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from lightkube import Client
 from lightkube.generic_resource import GenericNamespacedResource, create_namespaced_resource
+from lightkube.resources.core_v1 import ResourceQuota
 from lightkube.resources.rbac_authorization_v1 import RoleBinding
 
 from profiles_management.helpers import k8s
@@ -292,9 +293,7 @@ def generate_contributor_authorization_policy(
 def list_contributor_rolebindings(client: Client, namespace="") -> List[RoleBinding]:
     """Return a list of KFAM RoleBindings.
 
-    Only RoleBindings which have "role" and "user" annotations will be returned.
-    The RoleBinding for the Profile owner, with name namespaceAdmin, will not be
-    returned."
+    This should return a single RoleBinding with name `namespaceAdmin`
 
     Args:
         client: The lightkube client to use
@@ -520,3 +519,11 @@ def create_authorization_policy_for_profile_contributors(
                     contributor, profile.name, kfp_ui_principal, istio_ingressgateway_principal
                 )
             )
+
+
+def delete_owner_resources(client: Client, namespace="") -> None:
+    """Delete all owner resources that are created by the profile controller."""
+    log.info("Deleting all owner resources in namespace: %s", namespace)
+    client.delete(RoleBinding, name="namespaceAdmin", namespace=namespace)
+    client.delete(AuthorizationPolicy, name="ns-owner-access-istio", namespace=namespace)
+    client.delete(ResourceQuota, name="kf-resource-quota", namespace=namespace)

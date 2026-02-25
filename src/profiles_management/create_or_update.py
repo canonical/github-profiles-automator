@@ -109,6 +109,10 @@ def create_or_update_profiles(
             log.info("No Profile CR exists for Profile %s, creating it.", profile_name)
             existing_profile = profiles.apply_pmr_profile(client, profile)
 
+        # Ownership
+        log.info("Updating owners for Profile %s", profile_name)
+        profiles.update_owners(client, existing_profile, profile)
+
         # ResourceQuotas
         log.info("Creating or updating the ResourceQuota for Profile %s", profile_name)
         profiles.update_resource_quota(client, existing_profile, profile)
