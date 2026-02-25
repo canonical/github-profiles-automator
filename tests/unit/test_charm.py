@@ -1,12 +1,14 @@
 # Copyright 2024 Ubuntu
 # See LICENSE file for licensing details.
 
+import base64
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import ops
 import ops.testing
 import pytest
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
+from helpers import as_base64
 from ops.model import ActiveStatus, BlockedStatus
 
 from charm import GithubProfilesAutomatorCharm
@@ -138,6 +140,71 @@ def test_ssh_key_path(
     # Assert
     root = harness.get_filesystem_root("git-sync")
     assert (root / "etc/git-secret/ssh").exists()
+
+
+@pytest.mark.parametrize(
+    "ssl_items",
+    [(["ssl-ca"]), (["ssl-certificate", "ssl-key"]), (["ssl-ca", "ssl-certificate", "ssl-key"])],
+)
+def test_ssl_data_path(
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client, ssl_items
+):
+    """Test that SSL data is in the correct place in the workload container."""
+    # Arrange
+    harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
+    ssh_secret_content = {"ssh-key": "Sample SSH key"}
+    ssh_secret_id = harness.add_user_secret(ssh_secret_content)
+    harness.grant_secret(ssh_secret_id, "github-profiles-automator")
+    harness.update_config({"ssh-key-secret-id": ssh_secret_id})
+
+    secret_content = {item: as_base64(f"Sample: {item}") for item in ssl_items}
+    secret_id = harness.add_user_secret(secret_content)
+    harness.grant_secret(secret_id, "github-profiles-automator")
+    harness.update_config({"ssl-data-secret-id": secret_id})
+    harness.begin_with_initial_hooks()
+
+    # Mock:
+    # * leadership_gate to be active and executed
+    harness.charm.leadership_gate.get_status = MagicMock(return_value=ActiveStatus())
+    # Update the config
+    harness.update_config({"sync-period": 60})
+
+    # Assert
+    root = harness.get_filesystem_root("git-sync")
+    for item in ssl_items:
+        ssl_item_path = root / f"etc/git-secret/ssl/{item}"
+        assert ssl_item_path.exists()
+        assert ssl_item_path.read_text() == base64.b64decode(secret_content[item]).decode("utf-8")
+
+
+@pytest.mark.parametrize("ssl_items", [(["ssl-certificate"]), (["ssl-key"])])
+def test_missing_ssl_config(
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client, ssl_items
+):
+    """Test that passing an SSL certificate without a key (and vice versa) blocks the charm."""
+    # Arrange
+    harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
+    ssh_secret_content = {"ssh-key": "Sample SSH key"}
+    ssh_secret_id = harness.add_user_secret(ssh_secret_content)
+    harness.grant_secret(ssh_secret_id, "github-profiles-automator")
+    harness.update_config({"ssh-key-secret-id": ssh_secret_id})
+
+    secret_content = {item: as_base64(f"Sample: {item}") for item in ssl_items}
+    secret_id = harness.add_user_secret(secret_content)
+    harness.grant_secret(secret_id, "github-profiles-automator")
+    harness.update_config({"ssl-data-secret-id": secret_id})
+    harness.begin_with_initial_hooks()
+
+    # Mock:
+    # Update the config
+    harness.update_config({"sync-period": 60})
+
+    # Assert
+    assert isinstance(harness.model.unit.status, BlockedStatus)
+    assert (
+        "Both ssl-certificate and ssl-key must be provided together."
+        in harness.charm.model.unit.status.message
+    )
 
 
 def test_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
