@@ -170,10 +170,10 @@ def test_new_profile_owner_resources_are_updated(lightkube_client: Client):
     """Test that changing the owner of a profile updates all resources.
 
     The following resources should be updated:
-    - Profile
+    - Profile with corresponding name
     - RoleBinding with name `namespaceAdmin`
     - AuthorizationPolicy with name `ns-owner-access-istio`
-    - ResourceQuota with name ``
+    - ResourceQuota with name `kf-resource-quota`
     """
     profile_name = "test-profile"
     # Create a new profile
@@ -205,20 +205,20 @@ def test_new_profile_owner_resources_are_updated(lightkube_client: Client):
     assert updated_profile.spec["owner"]["name"] == new_owner
 
     log.info("Will check that RoleBinding, AuthorizationPolicy, and ResourceQuota are updated.")
-    rbs = kfam.list_owner_rolebindings(lightkube_client, profile_name)
-    assert len(rbs) == 1
-    assert rbs[0].metadata is not None
-    assert rbs[0].metadata.annotations is not None
-    assert rbs[0].metadata.annotations["user"] == new_owner
-    assert rbs[0].metadata.annotations["role"] == "admin"
-    assert rbs[0].roleRef.name == "kubeflow-admin"
+    rb = lightkube_client.get(RoleBinding, name="namespaceAdmin", namespace=profile_name)
+    assert rb.metadata is not None
+    assert rb.metadata.annotations is not None
+    assert rb.metadata.annotations["user"] == new_owner
+    assert rb.metadata.annotations["role"] == "admin"
+    assert rb.roleRef.name == "kubeflow-admin"
 
-    aps = kfam.list_owner_authorization_policies(lightkube_client, profile_name)
-    assert len(aps) == 1
-    assert aps[0].metadata is not None
-    assert aps[0].metadata.annotations is not None
-    assert aps[0].metadata.annotations["user"] == new_owner
-    assert aps[0].metadata.annotations["role"] == "admin"
+    ap = lightkube_client.get(
+        kfam.AuthorizationPolicy, name="ns-owner-access-istio", namespace=profile_name
+    )
+    assert ap.metadata is not None
+    assert ap.metadata.annotations is not None
+    assert ap.metadata.annotations["user"] == new_owner
+    assert ap.metadata.annotations["role"] == "admin"
 
     created_profile_quota = classes.ResourceQuotaSpecModel.model_validate(
         updated_profile["spec"]["resourceQuotaSpec"]

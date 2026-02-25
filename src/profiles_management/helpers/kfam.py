@@ -293,7 +293,9 @@ def generate_contributor_authorization_policy(
 def list_contributor_rolebindings(client: Client, namespace="") -> List[RoleBinding]:
     """Return a list of KFAM RoleBindings.
 
-    This should return a single RoleBinding with name `namespaceAdmin`
+    Only RoleBindings which have "role" and "user" annotations will be returned.
+    The RoleBinding for the Profile owner, with name namespaceAdmin, will not be
+    returned."
 
     Args:
         client: The lightkube client to use
