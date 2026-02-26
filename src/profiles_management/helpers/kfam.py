@@ -5,12 +5,13 @@ from typing import List
 
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from lightkube import Client
+from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import GenericNamespacedResource, create_namespaced_resource
 from lightkube.resources.core_v1 import ResourceQuota
 from lightkube.resources.rbac_authorization_v1 import RoleBinding
 
 from profiles_management.helpers import k8s
-from profiles_management.pmr.classes import Contributor, ContributorRole, Profile
+from profiles_management.pmr.classes import Contributor, ContributorRole, Profile, UserKind
 
 log = logging.getLogger(__name__)
 
@@ -523,9 +524,33 @@ def create_authorization_policy_for_profile_contributors(
             )
 
 
-def delete_owner_resources(client: Client, namespace="") -> None:
-    """Delete all owner resources that are created by the profile controller."""
+def delete_owner_resources(client: Client, namespace: str, current_kind: UserKind) -> None:
+    """Delete all owner resources that are created by the profile controller.
+
+    The resources to delete depend on the Profile kind.
+
+    Args:
+      client: The lightkube client to use.
+      namespace: The namespace to use.
+      current_kind: The kind of the Profile.
+
+    Raises:
+      ApiError: From lightkube if there was an error while trying to delete
+                  any resources.
+    """
     log.info("Deleting all owner resources in namespace: %s", namespace)
-    client.delete(RoleBinding, name="namespaceAdmin", namespace=namespace)
-    client.delete(AuthorizationPolicy, name="ns-owner-access-istio", namespace=namespace)
-    client.delete(ResourceQuota, name="kf-resource-quota", namespace=namespace)
+    if current_kind == UserKind.USER:
+        try:
+            client.delete(ResourceQuota, name="kf-resource-quota", namespace=namespace)
+        except ApiError as e:
+            if e.status.code == 404:
+                log.debug("ResourceQuota `kf-resource-quota` did not exist. Moving on...")
+            else:
+                raise e
+        client.delete(RoleBinding, name="namespaceAdmin", namespace=namespace)
+        client.delete(AuthorizationPolicy, name="ns-owner-access-istio", namespace=namespace)
+
+    elif current_kind == UserKind.SERVICE_ACCOUNT:
+        client.delete(RoleBinding, name="default-editor", namespace=namespace)
+        client.delete(RoleBinding, name="default-viewer", namespace=namespace)
+        client.delete(AuthorizationPolicy, name="ns-owner-access-istio", namespace=namespace)

@@ -86,6 +86,11 @@ class ResourceQuotaSpecModel(BaseModel):
     scope_selector: Optional[ScopeSelector] = None
     scopes: Optional[List[str]] = None
 
+    @property
+    def is_empty(self) -> bool:
+        """Returns True if all quota fields are None."""
+        return all(value is None for value in [self.hard, self.scope_selector, self.scopes])
+
 
 # Classes for rest of the PMR
 class UserKind(StrEnum):

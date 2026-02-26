@@ -1,0 +1,12 @@
+apiVersion: kubeflow.org/v1
+kind: Profile
+metadata:
+  name: nametest
+  namespace: nametest
+  labels:
+    purpose: testing
+spec:
+  owner:
+    kind: ServiceAccount
+    name: user@example.com
+  resourceQuotaSpec: {"hard": {"cpu": "2"}}
