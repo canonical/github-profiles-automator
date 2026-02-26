@@ -120,6 +120,7 @@ def apply_pmr_profile(
     return applied_profile
 
 
+# TODO: Remove after https://github.com/kubeflow/dashboard/issues/33 is fixed
 def update_owners(client: Client, existing_profile: GenericGlobalResource, pmr_profile: Profile):
     """Update the owner in the existing Profile, based on Profile defined in PMR.
 
