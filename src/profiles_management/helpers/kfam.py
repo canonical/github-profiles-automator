@@ -547,10 +547,5 @@ def delete_owner_resources(client: Client, namespace: str, current_kind: UserKin
                 log.debug("ResourceQuota `kf-resource-quota` did not exist. Moving on...")
             else:
                 raise e
-        client.delete(RoleBinding, name="namespaceAdmin", namespace=namespace)
-        client.delete(AuthorizationPolicy, name="ns-owner-access-istio", namespace=namespace)
-
-    elif current_kind == UserKind.SERVICE_ACCOUNT:
-        client.delete(RoleBinding, name="default-editor", namespace=namespace)
-        client.delete(RoleBinding, name="default-viewer", namespace=namespace)
-        client.delete(AuthorizationPolicy, name="ns-owner-access-istio", namespace=namespace)
+    client.delete(RoleBinding, name="namespaceAdmin", namespace=namespace)
+    client.delete(AuthorizationPolicy, name="ns-owner-access-istio", namespace=namespace)

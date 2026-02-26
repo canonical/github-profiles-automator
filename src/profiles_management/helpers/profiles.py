@@ -156,43 +156,27 @@ def update_owners(client: Client, existing_profile: GenericGlobalResource, pmr_p
 
     # Third, delete owner resources so they are recreated by the profiles controller
     # They have to be created before they are deleted
-    if current_kind == "User":
-        ensure_resource_exists(RoleBinding, "namespaceAdmin", pmr_profile.name, client)
-        ensure_resource_exists(
-            AuthorizationPolicy, "ns-owner-access-istio", pmr_profile.name, client
-        )
+    ensure_resource_exists(RoleBinding, "namespaceAdmin", pmr_profile.name, client)
+    ensure_resource_exists(AuthorizationPolicy, "ns-owner-access-istio", pmr_profile.name, client)
+    if UserKind(current_kind) == UserKind.USER:
         existing_profile_quota = ResourceQuotaSpecModel.model_validate(
             existing_profile["spec"]["resourceQuotaSpec"]
         )
         if not existing_profile_quota.is_empty:
             ensure_resource_exists(ResourceQuota, "kf-resource-quota", pmr_profile.name, client)
-        delete_owner_resources(client, pmr_profile.name, UserKind(current_kind))
         log.info("Successfully deleted owner resources for Profile: %s", pmr_profile.name)
-    elif current_kind == "ServiceAccount":
-        ensure_resource_exists(RoleBinding, "default-editor", pmr_profile.name, client)
-        ensure_resource_exists(RoleBinding, "default-viewer", pmr_profile.name, client)
-        ensure_resource_exists(
-            AuthorizationPolicy, "ns-owner-access-istio", pmr_profile.name, client
-        )
-        delete_owner_resources(client, pmr_profile.name, UserKind(current_kind))
+
+    delete_owner_resources(client, pmr_profile.name, UserKind(current_kind))
 
     # Finally, ensure that the resources have been recreated
+    ensure_resource_exists(RoleBinding, "namespaceAdmin", pmr_profile.name, client)
+    ensure_resource_exists(AuthorizationPolicy, "ns-owner-access-istio", pmr_profile.name, client)
     if pmr_profile.owner.kind == UserKind.USER:
-        ensure_resource_exists(RoleBinding, "namespaceAdmin", pmr_profile.name, client)
-        ensure_resource_exists(
-            AuthorizationPolicy, "ns-owner-access-istio", pmr_profile.name, client
-        )
         new_profile_quota = ResourceQuotaSpecModel.model_validate(
             existing_profile["spec"]["resourceQuotaSpec"]
         )
         if not new_profile_quota.is_empty:
             ensure_resource_exists(ResourceQuota, "kf-resource-quota", pmr_profile.name, client)
-    elif pmr_profile.owner.kind == UserKind.SERVICE_ACCOUNT:
-        ensure_resource_exists(RoleBinding, "default-editor", pmr_profile.name, client)
-        ensure_resource_exists(RoleBinding, "default-viewer", pmr_profile.name, client)
-        ensure_resource_exists(
-            AuthorizationPolicy, "ns-owner-access-istio", pmr_profile.name, client
-        )
 
 
 def update_resource_quota(

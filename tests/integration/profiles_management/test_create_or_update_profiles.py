@@ -234,7 +234,7 @@ def test_new_profile_owner_resources_are_updated(
       - ResourceQuota with name `kf-resource-quota` (only if it exists)
     2. For ServiceAccount:
       - Profile with corresponding name/owner
-      - RoleBindings `default-editor` and `default-viewer`
+      - RoleBinding with name `namespaceAdmin`
       - AuthorizationPolicy with name `ns-owner-access-istio`
       - No ResourceQuotas are created
     """
@@ -259,16 +259,12 @@ def test_new_profile_owner_resources_are_updated(
     assert updated_profile.spec["owner"]["kind"] == new_profile.owner.kind
 
     log.info("Will check that RoleBindings are updated.")
-    if new_profile.owner.kind == classes.UserKind.USER:
-        rb = lightkube_client.get(RoleBinding, name="namespaceAdmin", namespace=profile_name)
-        assert rb.metadata is not None
-        assert rb.metadata.annotations is not None
-        assert rb.metadata.annotations["user"] == new_profile.owner.name
-        assert rb.metadata.annotations["role"] == "admin"
-        assert rb.roleRef.name == "kubeflow-admin"
-    elif new_profile.owner.kind == classes.UserKind.SERVICE_ACCOUNT:
-        assert lightkube_client.get(RoleBinding, name="default-editor", namespace=profile_name)
-        assert lightkube_client.get(RoleBinding, name="default-viewer", namespace=profile_name)
+    rb = lightkube_client.get(RoleBinding, name="namespaceAdmin", namespace=profile_name)
+    assert rb.metadata is not None
+    assert rb.metadata.annotations is not None
+    assert rb.metadata.annotations["user"] == new_profile.owner.name
+    assert rb.metadata.annotations["role"] == "admin"
+    assert rb.roleRef.name == "kubeflow-admin"
 
     log.info("Will check that AuthorizationPolicies are updated.")
     ap = lightkube_client.get(
