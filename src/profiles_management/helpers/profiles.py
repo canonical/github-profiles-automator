@@ -167,7 +167,8 @@ def update_owners(client: Client, existing_profile: GenericGlobalResource, pmr_p
     log.info("Successfully deleted owner resources for Profile: %s", pmr_profile.name)
 
     # Finally, ensure that the resources have been recreated
-    ensure_all_resources(client, pmr_profile.name, pmr_profile.owner.kind, pmr_profile.resources)
+    # Skip ResourceQuota creation because it will be handled in update_resource_quota()
+    ensure_all_resources(client, pmr_profile.name, pmr_profile.owner.kind, None)
 
 
 def update_resource_quota(
