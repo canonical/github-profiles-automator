@@ -252,7 +252,7 @@ def test_new_profile_owner_resources_are_updated(
     assert updated_profile.spec["owner"]["kind"] == old_profile.owner.kind
 
     # Update the profile in the PMR
-    pmr.profiles["test-profile-owner"] = new_profile
+    pmr.profiles[PROFILE_TEST_NAME] = new_profile
     create_or_update_profiles(lightkube_client, pmr, KFP_PRINCIPAL, ISTIO_PRINCIPAL)
 
     log.info("Will check if the profile owner was changed as expected.")
