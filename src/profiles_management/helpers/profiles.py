@@ -1,9 +1,10 @@
 """Utility module for manipulating Profiles."""
 
 import logging
-from typing import Iterator
+from typing import Iterator, Optional
 
 from lightkube import Client
+from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import (
     GenericGlobalResource,
     GenericNamespacedResource,
@@ -14,8 +15,8 @@ from lightkube.resources.rbac_authorization_v1 import RoleBinding
 from lightkube.types import PatchType
 
 from profiles_management.helpers import k8s
-from profiles_management.helpers.k8s import ensure_namespace_exists, ensure_resource_exists
-from profiles_management.helpers.kfam import AuthorizationPolicy, delete_owner_resources
+from profiles_management.helpers.k8s import ensure_namespace_exists
+from profiles_management.helpers.kfam import AuthorizationPolicy
 from profiles_management.pmr.classes import Profile, ResourceQuotaSpecModel, UserKind
 
 ProfileLightkube = create_global_resource(
@@ -130,6 +131,8 @@ def update_owners(client: Client, existing_profile: GenericGlobalResource, pmr_p
     The reason we have to manually update is due a limitation existing in
     upstream Kubeflow, see: https://github.com/kubeflow/dashboard/issues/33
 
+    We follow the workaround explain in the description of the issue.
+
     Args:
         client: The lightkube client to use.
         existing_profile: The existing Profile lightkube object in the cluster.
@@ -156,27 +159,15 @@ def update_owners(client: Client, existing_profile: GenericGlobalResource, pmr_p
 
     # Third, delete owner resources so they are recreated by the profiles controller
     # They have to be created before they are deleted
-    ensure_resource_exists(RoleBinding, "namespaceAdmin", pmr_profile.name, client)
-    ensure_resource_exists(AuthorizationPolicy, "ns-owner-access-istio", pmr_profile.name, client)
-    if UserKind(current_kind) == UserKind.USER:
-        existing_profile_quota = ResourceQuotaSpecModel.model_validate(
-            existing_profile["spec"]["resourceQuotaSpec"]
-        )
-        if not existing_profile_quota.is_empty:
-            ensure_resource_exists(ResourceQuota, "kf-resource-quota", pmr_profile.name, client)
-        log.info("Successfully deleted owner resources for Profile: %s", pmr_profile.name)
-
+    existing_profile_quota = ResourceQuotaSpecModel.model_validate(
+        existing_profile["spec"]["resourceQuotaSpec"]
+    )
+    ensure_all_resources(client, pmr_profile.name, UserKind(current_kind), existing_profile_quota)
     delete_owner_resources(client, pmr_profile.name, UserKind(current_kind))
+    log.info("Successfully deleted owner resources for Profile: %s", pmr_profile.name)
 
     # Finally, ensure that the resources have been recreated
-    ensure_resource_exists(RoleBinding, "namespaceAdmin", pmr_profile.name, client)
-    ensure_resource_exists(AuthorizationPolicy, "ns-owner-access-istio", pmr_profile.name, client)
-    if pmr_profile.owner.kind == UserKind.USER:
-        new_profile_quota = ResourceQuotaSpecModel.model_validate(
-            existing_profile["spec"]["resourceQuotaSpec"]
-        )
-        if not new_profile_quota.is_empty:
-            ensure_resource_exists(ResourceQuota, "kf-resource-quota", pmr_profile.name, client)
+    ensure_all_resources(client, pmr_profile.name, pmr_profile.owner.kind, pmr_profile.resources)
 
 
 def update_resource_quota(
@@ -211,3 +202,48 @@ def update_resource_quota(
 
     client.patch(ProfileLightkube, name=pmr_profile.name, obj=patch, patch_type=PatchType.MERGE)
     log.info("Successfully patched resourceQuotaSpec of Profile: %s", pmr_profile.name)
+
+
+def ensure_all_resources(
+    client: Client, namespace: str, user_kind: UserKind, quota: Optional[ResourceQuotaSpecModel]
+) -> None:
+    """Ensure all owner resources that should be created by the profile controller exist.
+
+    Args:
+      client: The lightkube client to use.
+      namespace: The namespace to use.
+      user_kind: The kind of the Profile
+      quota: ResourceQuotaSpecModel of the profile (if it exists)
+    """
+    k8s.ensure_resource_exists(RoleBinding, "namespaceAdmin", namespace, client)
+    k8s.ensure_resource_exists(AuthorizationPolicy, "ns-owner-access-istio", namespace, client)
+    if user_kind == UserKind.USER and quota and not quota.is_empty:
+        k8s.ensure_resource_exists(ResourceQuota, "kf-resource-quota", namespace, client)
+
+
+def delete_owner_resources(client: Client, namespace: str, current_kind: UserKind) -> None:
+    """Delete all owner resources that are created by the profile controller.
+
+    The resources to delete depend on the Profile kind, as described in:
+    https://github.com/kubeflow/dashboard/issues/33
+
+    Args:
+      client: The lightkube client to use.
+      namespace: The namespace to use.
+      current_kind: The kind of the Profile.
+
+    Raises:
+      ApiError: From lightkube if there was an error while trying to delete
+                  any resources.
+    """
+    log.info("Deleting all owner resources in namespace: %s", namespace)
+    if current_kind == UserKind.USER:
+        try:
+            client.delete(ResourceQuota, name="kf-resource-quota", namespace=namespace)
+        except ApiError as e:
+            if e.status.code == 404:
+                log.debug("ResourceQuota `kf-resource-quota` did not exist. Moving on...")
+            else:
+                raise e
+    client.delete(RoleBinding, name="namespaceAdmin", namespace=namespace)
+    client.delete(AuthorizationPolicy, name="ns-owner-access-istio", namespace=namespace)

@@ -1,7 +1,7 @@
 """This package provides classes for validating and defining a PMR.
 
 The goal of these classes is to represent the PMR in a more
-Pythonic way, rather than a dict of vavlues.
+Pythonic way, rather than a dict of values.
 
 The classes should also provide some common helper methods for
 traversing the information of the PMR, but not functions for
