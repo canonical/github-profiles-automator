@@ -1,7 +1,7 @@
 """This package provides classes for validating and defining a PMR.
 
 The goal of these classes is to represent the PMR in a more
-Pythonic way, rather than a dict of vavlues.
+Pythonic way, rather than a dict of values.
 
 The classes should also provide some common helper methods for
 traversing the information of the PMR, but not functions for
@@ -85,6 +85,11 @@ class ResourceQuotaSpecModel(BaseModel):
     hard: Optional[Dict[str, Any]] = None
     scope_selector: Optional[ScopeSelector] = None
     scopes: Optional[List[str]] = None
+
+    @property
+    def is_empty(self) -> bool:
+        """Returns True if all quota fields are None."""
+        return all(value is None for value in [self.hard, self.scope_selector, self.scopes])
 
 
 # Classes for rest of the PMR

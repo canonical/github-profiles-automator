@@ -18,7 +18,7 @@ AuthorizationPolicy = create_namespaced_resource(
 codecs.resource_registry.register(AuthorizationPolicy)
 
 
-def has_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> bool:
+def has_valid_kfam_annotations(resource: GenericNamespacedResource | RoleBinding) -> bool:
     """Check if resource has "user" and "role" KFAM annotations.
 
     Args:
@@ -73,7 +73,7 @@ def list_contributor_rolebindings(client: Client, namespace="") -> List[RoleBind
     return [
         rb
         for rb in role_bindings
-        if has_kfam_annotations(rb) and not resource_is_for_profile_owner(rb)
+        if has_valid_kfam_annotations(rb) and not resource_is_for_profile_owner(rb)
     ]
 
 
@@ -101,5 +101,5 @@ def list_contributor_authorization_policies(
     return [
         ap
         for ap in authorization_policies
-        if has_kfam_annotations(ap) and not resource_is_for_profile_owner(ap)
+        if has_valid_kfam_annotations(ap) and not resource_is_for_profile_owner(ap)
     ]

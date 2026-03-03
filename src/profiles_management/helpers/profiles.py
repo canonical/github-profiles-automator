@@ -1,19 +1,23 @@
 """Utility module for manipulating Profiles."""
 
 import logging
-from typing import Iterator
+from typing import Iterator, Optional
 
 from lightkube import Client
+from lightkube.core.exceptions import ApiError
 from lightkube.generic_resource import (
     GenericGlobalResource,
     GenericNamespacedResource,
     create_global_resource,
 )
+from lightkube.resources.core_v1 import Namespace, ResourceQuota
+from lightkube.resources.rbac_authorization_v1 import RoleBinding
 from lightkube.types import PatchType
 
 from profiles_management.helpers import k8s
 from profiles_management.helpers.k8s import ensure_namespace_exists
-from profiles_management.pmr import classes
+from profiles_management.helpers.kfam import AuthorizationPolicy
+from profiles_management.pmr.classes import Profile, ResourceQuotaSpecModel, UserKind
 
 ProfileLightkube = create_global_resource(
     group="kubeflow.org", version="v1", kind="Profile", plural="profiles"
@@ -59,7 +63,7 @@ def remove_profile(profile: GenericGlobalResource, client: Client, wait_namespac
         k8s.ensure_namespace_is_deleted(nm, client)
 
 
-def lightkube_profile_from_pmr_profile(profile: classes.Profile) -> GenericGlobalResource:
+def lightkube_profile_from_pmr_profile(profile: Profile) -> GenericGlobalResource:
     """Create lightkube GenericGlobalResource from PMR Profile class instance.
 
     Args:
@@ -91,7 +95,7 @@ def lightkube_profile_from_pmr_profile(profile: classes.Profile) -> GenericGloba
 
 
 def apply_pmr_profile(
-    client: Client, profile: classes.Profile, wait_namespace=True
+    client: Client, profile: Profile, wait_namespace=True
 ) -> GenericGlobalResource:
     """Apply a PMR Profile and return the created API Object from client.apply().
 
@@ -117,8 +121,58 @@ def apply_pmr_profile(
     return applied_profile
 
 
+# TODO: Remove after https://github.com/kubeflow/dashboard/issues/33 is fixed
+def update_owners(client: Client, existing_profile: GenericGlobalResource, pmr_profile: Profile):
+    """Update the owner in the existing Profile, based on Profile defined in PMR.
+
+    If the owner/kind combination in the existing Profile and the PMR Profile are
+    the same, then no update will happen.
+
+    The reason we have to manually update is due a limitation existing in
+    upstream Kubeflow, see: https://github.com/kubeflow/dashboard/issues/33
+
+    We follow the workaround explain in the description of the issue.
+
+    Args:
+        client: The lightkube client to use.
+        existing_profile: The existing Profile lightkube object in the cluster.
+        pmr_profile: The new PMR representation of the profile.
+    """
+    current_owner = existing_profile["spec"]["owner"]["name"]
+    current_kind = existing_profile["spec"]["owner"]["kind"]
+    if (
+        current_owner == pmr_profile.owner.name
+        and UserKind(current_kind) == pmr_profile.owner.kind
+    ):
+        return
+    log.info("New owner detected for Profile: %s", pmr_profile.name)
+
+    # First, patch the profile
+    patch = {"spec": {"owner": {"name": pmr_profile.owner.name, "kind": pmr_profile.owner.kind}}}
+    client.patch(ProfileLightkube, name=pmr_profile.name, obj=patch, patch_type=PatchType.MERGE)
+    log.info("Successfully patched owner for Profile: %s", pmr_profile.name)
+
+    # Second, patch the namespace
+    patch = {"metadata": {"annotations": {"owner": pmr_profile.owner.name}}}
+    client.patch(res=Namespace, name=pmr_profile.name, obj=patch, patch_type=PatchType.MERGE)
+    log.info("Successfully patched namespace for Profile: %s", pmr_profile.name)
+
+    # Third, delete owner resources so they are recreated by the profiles controller
+    # They have to be created before they are deleted
+    existing_profile_quota = ResourceQuotaSpecModel.model_validate(
+        existing_profile["spec"]["resourceQuotaSpec"]
+    )
+    ensure_all_resources(client, pmr_profile.name, UserKind(current_kind), existing_profile_quota)
+    delete_owner_resources(client, pmr_profile.name, UserKind(current_kind))
+    log.info("Successfully deleted owner resources for Profile: %s", pmr_profile.name)
+
+    # Finally, ensure that the resources have been recreated
+    # Skip ResourceQuota creation because it will be handled in update_resource_quota()
+    ensure_all_resources(client, pmr_profile.name, pmr_profile.owner.kind, None)
+
+
 def update_resource_quota(
-    client: Client, existing_profile: GenericGlobalResource, pmr_profile: classes.Profile
+    client: Client, existing_profile: GenericGlobalResource, pmr_profile: Profile
 ):
     """Update the ResourceQuota in the existing Profile, based on Profile defined in PMR.
 
@@ -130,7 +184,7 @@ def update_resource_quota(
         existing_profile: The existing Profile lightkube object in the cluster.
         pmr_profile: To update the ResourceQuota in the cluster from this object.
     """
-    existing_resource_quota = classes.ResourceQuotaSpecModel.model_validate(
+    existing_resource_quota = ResourceQuotaSpecModel.model_validate(
         existing_profile["spec"]["resourceQuotaSpec"]
     )
 
@@ -149,3 +203,48 @@ def update_resource_quota(
 
     client.patch(ProfileLightkube, name=pmr_profile.name, obj=patch, patch_type=PatchType.MERGE)
     log.info("Successfully patched resourceQuotaSpec of Profile: %s", pmr_profile.name)
+
+
+def ensure_all_resources(
+    client: Client, namespace: str, user_kind: UserKind, quota: Optional[ResourceQuotaSpecModel]
+) -> None:
+    """Ensure all owner resources that should be created by the profile controller exist.
+
+    Args:
+      client: The lightkube client to use.
+      namespace: The namespace to use.
+      user_kind: The kind of the Profile
+      quota: ResourceQuotaSpecModel of the profile (if it exists)
+    """
+    k8s.ensure_resource_exists(RoleBinding, "namespaceAdmin", namespace, client)
+    k8s.ensure_resource_exists(AuthorizationPolicy, "ns-owner-access-istio", namespace, client)
+    if user_kind == UserKind.USER and quota and not quota.is_empty:
+        k8s.ensure_resource_exists(ResourceQuota, "kf-resource-quota", namespace, client)
+
+
+def delete_owner_resources(client: Client, namespace: str, current_kind: UserKind) -> None:
+    """Delete all owner resources that are created by the profile controller.
+
+    The resources to delete depend on the Profile kind, as described in:
+    https://github.com/kubeflow/dashboard/issues/33
+
+    Args:
+      client: The lightkube client to use.
+      namespace: The namespace to use.
+      current_kind: The kind of the Profile.
+
+    Raises:
+      ApiError: From lightkube if there was an error while trying to delete
+                  any resources.
+    """
+    log.info("Deleting all owner resources in namespace: %s", namespace)
+    if current_kind == UserKind.USER:
+        try:
+            client.delete(ResourceQuota, name="kf-resource-quota", namespace=namespace)
+        except ApiError as e:
+            if e.status.code == 404:
+                log.debug("ResourceQuota `kf-resource-quota` did not exist. Moving on...")
+            else:
+                raise e
+    client.delete(RoleBinding, name="namespaceAdmin", namespace=namespace)
+    client.delete(AuthorizationPolicy, name="ns-owner-access-istio", namespace=namespace)

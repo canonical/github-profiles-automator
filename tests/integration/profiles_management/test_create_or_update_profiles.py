@@ -166,6 +166,127 @@ def test_surplus_profile_resources_are_deleted(lightkube_client: Client):
     profiles.remove_profile(profile, lightkube_client)
 
 
+PROFILE_TEST_NAME = "test-profile-owner"
+
+
+@pytest.mark.parametrize(
+    "old_profile,new_profile",
+    [
+        (
+            classes.Profile(
+                name=PROFILE_TEST_NAME,
+                owner=classes.Owner(name="noha", kind=classes.UserKind.USER),
+                resources=classes.ResourceQuotaSpecModel.model_validate({"hard": {"cpu": "1"}}),
+            ),
+            classes.Profile(
+                name=PROFILE_TEST_NAME,
+                owner=classes.Owner(name="orfeas", kind=classes.UserKind.USER),
+                resources=classes.ResourceQuotaSpecModel.model_validate({"hard": {"cpu": "2"}}),
+            ),
+        ),
+        (
+            classes.Profile(
+                name=PROFILE_TEST_NAME,
+                owner=classes.Owner(name="noha", kind=classes.UserKind.SERVICE_ACCOUNT),
+                resources=classes.ResourceQuotaSpecModel.model_validate({"hard": {"cpu": "1"}}),
+            ),
+            classes.Profile(
+                name=PROFILE_TEST_NAME,
+                owner=classes.Owner(name="orfeas", kind=classes.UserKind.SERVICE_ACCOUNT),
+                resources=classes.ResourceQuotaSpecModel.model_validate({"hard": {"cpu": "2"}}),
+            ),
+        ),
+        (
+            classes.Profile(
+                name=PROFILE_TEST_NAME,
+                owner=classes.Owner(name="noha", kind=classes.UserKind.USER),
+                resources=classes.ResourceQuotaSpecModel.model_validate({"hard": {"cpu": "1"}}),
+            ),
+            classes.Profile(
+                name=PROFILE_TEST_NAME,
+                owner=classes.Owner(name="orfeas", kind=classes.UserKind.SERVICE_ACCOUNT),
+                resources=classes.ResourceQuotaSpecModel.model_validate({"hard": {"cpu": "2"}}),
+            ),
+        ),
+        (
+            classes.Profile(
+                name=PROFILE_TEST_NAME,
+                owner=classes.Owner(name="noha", kind=classes.UserKind.SERVICE_ACCOUNT),
+                resources=classes.ResourceQuotaSpecModel.model_validate({"hard": {"cpu": "1"}}),
+            ),
+            classes.Profile(
+                name=PROFILE_TEST_NAME,
+                owner=classes.Owner(name="orfeas", kind=classes.UserKind.USER),
+                resources=classes.ResourceQuotaSpecModel.model_validate({"hard": {"cpu": "2"}}),
+            ),
+        ),
+    ],
+)
+def test_new_profile_owner_resources_are_updated(
+    lightkube_client: Client, old_profile: classes.Profile, new_profile: classes.Profile
+):
+    """Test that changing the owner of a profile updates all resources.
+
+    We check different combinations of User/ServiceAccount owners.
+
+    Depending on the kind of owner, the following resources should be updated:
+    1. For User:
+      - Profile with corresponding name/owner
+      - RoleBinding with name `namespaceAdmin`
+      - AuthorizationPolicy with name `ns-owner-access-istio`
+      - ResourceQuota with name `kf-resource-quota` (only if it exists)
+    2. For ServiceAccount:
+      - Profile with corresponding name/owner
+      - RoleBinding with name `namespaceAdmin`
+      - AuthorizationPolicy with name `ns-owner-access-istio`
+      - No ResourceQuotas are created
+    """
+    # Create a new profile
+    pmr = classes.ProfilesManagementRepresentation()
+    pmr.add_profile(old_profile)
+
+    create_or_update_profiles(lightkube_client, pmr, KFP_PRINCIPAL, ISTIO_PRINCIPAL)
+
+    updated_profile = profiles.get_profile(lightkube_client, PROFILE_TEST_NAME)
+    assert updated_profile.spec["owner"]["name"] == old_profile.owner.name
+    assert updated_profile.spec["owner"]["kind"] == old_profile.owner.kind
+
+    # Update the profile in the PMR
+    pmr.profiles[PROFILE_TEST_NAME] = new_profile
+    create_or_update_profiles(lightkube_client, pmr, KFP_PRINCIPAL, ISTIO_PRINCIPAL)
+
+    log.info("Will check if the profile owner was changed as expected.")
+    updated_profile = profiles.get_profile(lightkube_client, PROFILE_TEST_NAME)
+    assert updated_profile.spec["owner"]["name"] == new_profile.owner.name
+    assert updated_profile.spec["owner"]["kind"] == new_profile.owner.kind
+
+    log.info("Will check that RoleBindings are updated.")
+    rb = lightkube_client.get(RoleBinding, name="namespaceAdmin", namespace=PROFILE_TEST_NAME)
+    assert rb.metadata is not None
+    assert rb.metadata.annotations is not None
+    assert rb.metadata.annotations["user"] == new_profile.owner.name
+    assert rb.metadata.annotations["role"] == "admin"
+    assert rb.roleRef.name == "kubeflow-admin"
+
+    log.info("Will check that AuthorizationPolicies are updated.")
+    ap = lightkube_client.get(
+        kfam.AuthorizationPolicy, name="ns-owner-access-istio", namespace=PROFILE_TEST_NAME
+    )
+    assert ap.metadata is not None
+    assert ap.metadata.annotations is not None
+    assert ap.metadata.annotations["user"] == new_profile.owner.name
+    assert ap.metadata.annotations["role"] == "admin"
+
+    log.info("Will check that ResourceQuotas are updated.")
+    if new_profile.owner.kind == classes.UserKind.USER:
+        created_profile_quota = classes.ResourceQuotaSpecModel.model_validate(
+            updated_profile["spec"]["resourceQuotaSpec"]
+        )
+        assert created_profile_quota == new_profile.resources
+
+    profiles.remove_profile(updated_profile, lightkube_client)
+
+
 def test_existing_profile_contributor_resources_are_updated(lightkube_client: Client):
     """Existing contributor RoleBinding and AuthorizationPolicies should be updated to "admin"."""
     ns = "test-existing-profile-resources-are-updated"
