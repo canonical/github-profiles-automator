@@ -124,6 +124,8 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         )
         # Update the Profiles in case `pmr-yaml-path` has been changed
         self.framework.observe(self.on.config_changed, self._on_event_sync_profiles)
+        self.framework.observe(self.on.secret_changed, self._on_event_sync_profiles)
+        self.framework.observe(self.on.secret_remove, self._on_event_sync_profiles)
         # Update the Profiles in case they didn't update in the first sync
         self.framework.observe(self.on.update_status, self._on_event_sync_profiles)
 

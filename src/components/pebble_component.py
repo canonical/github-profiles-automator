@@ -39,6 +39,11 @@ class GitSyncInputs(BaseModel):
 
 class GitSyncPebbleService(PebbleServiceComponent):
     """Define the PebbleService component for this charm."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Manually add secret_changed and secret_remove on events to observe
+        self._events_to_observe.append(getattr(self._charm.on, "secret_changed"))
+        self._events_to_observe.append(getattr(self._charm.on, "secret_remove"))
 
     def get_status(self) -> StatusBase:
         """Return the status of this component.
