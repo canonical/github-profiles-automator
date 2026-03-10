@@ -2,7 +2,6 @@
 # See LICENSE file for licensing details.
 
 import base64
-import logging
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import ops
@@ -13,8 +12,6 @@ from helpers import as_base64
 from ops.model import ActiveStatus, BlockedStatus
 
 from charm import GithubProfilesAutomatorCharm
-
-logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
@@ -227,8 +224,6 @@ def test_update_secret(
     harness.grant_secret(secret_id, "github-profiles-automator")
     harness.update_config({"ssl-data-secret-id": secret_id})
     harness.begin_with_initial_hooks()
-    content = harness.model.get_secret(id=secret_id).get_content(refresh=True)
-    logger.warning(content)
 
     # Mock
     # Update the secret, _on_event_sync_profiles should be called
@@ -237,7 +232,6 @@ def test_update_secret(
     new_ssl_items = ["ssl-certificate", "ssl-key"]
     new_secret_content = {item: as_base64(f"New sample: {item}") for item in new_ssl_items}
     harness.set_secret_content(secret_id, new_secret_content)
-    content = harness.model.get_secret(id=secret_id).get_content(refresh=True)
 
     # Assert
     harness.charm._on_event_sync_profiles.assert_called_once()
