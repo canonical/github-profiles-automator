@@ -197,7 +197,6 @@ def test_missing_ssl_config(
 
     # Mock:
     # Update the config
-    harness.charm.leadership_gate.get_status = MagicMock(return_value=ActiveStatus())
     harness.update_config({"sync-period": 60})
 
     # Assert
