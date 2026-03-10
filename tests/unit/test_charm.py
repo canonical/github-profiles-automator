@@ -197,6 +197,7 @@ def test_missing_ssl_config(
 
     # Mock:
     # Update the config
+    harness.charm.leadership_gate.get_status = MagicMock(return_value=ActiveStatus())
     harness.update_config({"sync-period": 60})
 
     # Assert
@@ -205,6 +206,66 @@ def test_missing_ssl_config(
         "Both ssl-certificate and ssl-key must be provided together."
         in harness.charm.model.unit.status.message
     )
+
+
+def test_update_secret(
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client
+):
+    """Test that updating the secret contents is properly observed by the charm."""
+    # Arrange
+    harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
+    ssh_secret_content = {"ssh-key": "Sample SSH key"}
+    ssh_secret_id = harness.add_user_secret(ssh_secret_content)
+    harness.grant_secret(ssh_secret_id, "github-profiles-automator")
+    harness.update_config({"ssh-key-secret-id": ssh_secret_id})
+
+    ssl_items = ["ssl-certificate", "ssl-key"]
+    secret_content = {item: as_base64(f"Sample: {item}") for item in ssl_items}
+    secret_id = harness.add_user_secret(secret_content)
+    harness.grant_secret(secret_id, "github-profiles-automator")
+    harness.update_config({"ssl-data-secret-id": secret_id})
+    harness.begin_with_initial_hooks()
+
+    # Mock
+    # Update the secret, _on_event_sync_profiles should be called
+    harness.charm.leadership_gate.get_status = MagicMock(return_value=ActiveStatus())
+    harness.charm._on_event_sync_profiles = MagicMock()
+    new_ssl_items = ["ssl-certificate", "ssl-key"]
+    new_secret_content = {item: as_base64(f"New sample: {item}") for item in new_ssl_items}
+    harness.set_secret_content(secret_id, new_secret_content)
+
+    # Assert
+    harness.charm._on_event_sync_profiles.assert_called_once()
+
+
+def test_remove_secret(
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm], mocked_lightkube_client
+):
+    """Test that removing a secret is properly observed by the charm."""
+    # Arrange
+    harness.update_config({"repository": "git@github.com:example-user/example-repo.git"})
+    ssh_secret_content = {"ssh-key": "Sample SSH key"}
+    ssh_secret_id = harness.add_user_secret(ssh_secret_content)
+    harness.grant_secret(ssh_secret_id, "github-profiles-automator")
+    harness.update_config({"ssh-key-secret-id": ssh_secret_id})
+
+    ssl_items = ["ssl-certificate", "ssl-key"]
+    secret_content = {item: as_base64(f"Sample: {item}") for item in ssl_items}
+    secret_id = harness.add_user_secret(secret_content)
+    harness.grant_secret(secret_id, "github-profiles-automator")
+    harness.update_config({"ssl-data-secret-id": secret_id})
+    harness.begin_with_initial_hooks()
+
+    # Mock
+    # Remove the secret, _on_event_sync_profiles should be called
+    harness.charm.leadership_gate.get_status = MagicMock(return_value=ActiveStatus())
+    harness.charm._on_event_sync_profiles = MagicMock()
+    revision = harness.get_secret_revisions(secret_id)[-1]
+    # Trigger removal using the last revision of the secret
+    harness.trigger_secret_removal(secret_id, revision)
+
+    # Assert
+    harness.charm._on_event_sync_profiles.assert_called_once()
 
 
 def test_pmr_from_path(harness: ops.testing.Harness[GithubProfilesAutomatorCharm]):
