@@ -76,7 +76,7 @@ optional = true
 
 [tool.poetry.group.fmt.dependencies]
 ruff = "^0.8.0"
-black = "^24.10.0"
+black = "^26.3.1"
 
 # lint
 [tool.poetry.group.lint]
@@ -86,7 +86,7 @@ optional = true
 ruff = "^0.8.0"
 codespell = "^2.3.0"
 pyright = "^1.1.386"
-black = "^24.10.0"
+black = "^26.3.1"
 pytest = "^8.3.3"
 pytest-operator = ">0.30"
 
