@@ -13,7 +13,7 @@ options:
   sync-period:
     default: 60
     description: |
-      How long to wait between sync attempts.
+      How long to wait between sync attempts, in seconds.
     type: int
   pmr-yaml-path:
     default: "pmr.yaml"
