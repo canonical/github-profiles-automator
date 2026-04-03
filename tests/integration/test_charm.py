@@ -164,7 +164,7 @@ async def test_secret_changed(ops_test: OpsTest):
 
     await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10)
 
-    rc, stdout, stderr = await ops_test.juju(
+    rc, stdout, _ = await ops_test.juju(
         "ssh", "--container", "git-sync", unit_name, "cat", SSH_KEY_DESTINATION_PATH
     )
     assert rc == 0
