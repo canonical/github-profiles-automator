@@ -466,7 +466,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             return
         else:
             if self.container.can_connect():
-                # Remove previous instances of the key if they exist
+                # Remove previous instances of the keys if they exist
                 try:
                     for key in ["ssl-ca", "ssl-certificate", "ssl-key"]:
                         self.container.remove_path(SSL_DATA_DIR / key)
