@@ -7,7 +7,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 PROFILES_CHARM = "kubeflow-profiles"
-PROFILES_CHANNEL = "1.9/stable"
+PROFILES_CHANNEL = "1.10/stable"
 PROFILES_TRUST = True
 
 log = logging.getLogger(__name__)

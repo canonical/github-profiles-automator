@@ -18,12 +18,14 @@ APP_NAME = METADATA["name"]
 CHARM_TRUST = True
 
 GITHUB_REPOSITORY_URL = "https://github.com/canonical/github-profiles-automator.git"
+GITHUB_REPOSITORY_URL_SSH = "git@github.com:canonical/github-profiles-automator.git"
+SSH_KEY_DESTINATION_PATH = "/etc/git-secret/ssh"
 GITHUB_PMR_FULL_PATH = "tests/samples/pmr-sample-full.yaml"
 GITHUB_PMR_SINGLE_PATH = "tests/samples/pmr-sample-single.yaml"
 GITHUB_GIT_REVISION = "main"
 
 KUBEFLOW_PROFILES_CHARM = "kubeflow-profiles"
-KUBEFLOW_PROFILES_CHANNEL = "1.9/stable"
+KUBEFLOW_PROFILES_CHANNEL = "1.10/stable"
 KUBEFLOW_PROFILES_TRUST = True
 
 
@@ -142,3 +144,42 @@ async def test_pebble_service(ops_test: OpsTest):
 
     logger.info("Waiting for the Github Profiles Automator charm to become active.")
     await model.wait_for_idle(apps=[APP_NAME], status="active", timeout=60 * 10)
+
+
+@pytest.mark.abort_on_fail
+async def test_secret_changed(ops_test: OpsTest):
+    """Pass an SSH key, then update it to see that the changes have been reflected."""
+    secret_name = "ssh-secret"
+    old_ssh_key = "Old key"
+    model = get_model(ops_test)
+    app = get_application(ops_test)
+    unit_name = app.units[0].name
+
+    # Switch to connecting via SSH
+    await app.set_config({"repository": GITHUB_REPOSITORY_URL_SSH})
+
+    secret_id = await model.add_secret(name=secret_name, data_args=[f"ssh-key={old_ssh_key}"])
+    await model.grant_secret(secret_name, app.name)
+    await app.set_config({"ssh-key-secret-id": secret_id})
+
+    await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10)
+
+    rc, stdout, stderr = await ops_test.juju(
+        "ssh", "--container", "git-sync", unit_name, "cat", SSH_KEY_DESTINATION_PATH
+    )
+    assert rc == 0
+    assert old_ssh_key in stdout
+
+    # Update SSH key and expect changes in the workload container
+    new_ssh_key = "New key"
+    await model.update_secret(
+        name=secret_name, new_name=secret_name, data_args=[f"ssh-key={new_ssh_key}"]
+    )
+    await app.set_config({"ssh-key-secret-id": secret_id})
+    await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10)
+
+    rc, stdout, _ = await ops_test.juju(
+        "ssh", "--container", "git-sync", unit_name, "cat", SSH_KEY_DESTINATION_PATH
+    )
+    assert rc == 0
+    assert new_ssh_key in stdout

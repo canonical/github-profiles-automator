@@ -49,7 +49,7 @@ from re-deploying the Profiles Controller as well as the Profiles can now be del
 
 You can install the Profiles Controller with the following command:
 ```bash
-juju deploy kubeflow-profiles --channel 1.9/stable --trust
+juju deploy kubeflow-profiles --channel 1.10/stable --trust
 ```
 
 #### Remove finaliser from Profile
