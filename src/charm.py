@@ -382,10 +382,11 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             self.repository_type = RepositoryType.SSH
             if not self.ssh_key:
                 # Remove previous instances of the key if they exist
-                try:
-                    self.container.remove_path(SSH_KEY_DESTINATION_PATH)
-                except ops.pebble.PathError:
-                    pass  # already gone
+                if self.container.can_connect():
+                    try:
+                        self.container.remove_path(SSH_KEY_DESTINATION_PATH)
+                    except ops.pebble.PathError:
+                        pass  # already gone
                 raise ErrorWithStatus(
                     "To connect via an SSH URL you need to provide an SSH key.",
                     ops.BlockedStatus,
@@ -464,12 +465,13 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 )
             return
         else:
-            # Remove previous instances of the key if they exist
-            try:
-                for key in ["ssl-ca", "ssl-certificate", "ssl-key"]:
-                    self.container.remove_path(SSL_DATA_DIR / key)
-            except ops.pebble.PathError:
-                pass  # already gone
+            if self.container.can_connect():
+                # Remove previous instances of the key if they exist
+                try:
+                    for key in ["ssl-ca", "ssl-certificate", "ssl-key"]:
+                        self.container.remove_path(SSL_DATA_DIR / key)
+                except ops.pebble.PathError:
+                    pass  # already gone
 
 
 def is_https_url(url: str) -> bool:
