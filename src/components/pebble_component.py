@@ -42,7 +42,7 @@ class GitSyncPebbleService(PebbleServiceComponent):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Manually add secret_changed and secret_remove on events to observe
+        # Manually add secret_changed on events to observe
         self._events_to_observe.append(getattr(self._charm.on, "secret_changed"))
 
     def get_status(self) -> StatusBase:
