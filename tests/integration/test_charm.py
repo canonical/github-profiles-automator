@@ -28,6 +28,10 @@ KUBEFLOW_PROFILES_CHARM = "kubeflow-profiles"
 KUBEFLOW_PROFILES_CHANNEL = "1.9/stable"
 KUBEFLOW_PROFILES_TRUST = True
 
+ISTIO_CHARM = "istio-pilot"
+ISTIO_CHANNEL = "1.24/stable"
+ISTIO_TRUST = True
+
 
 @pytest.fixture(scope="session")
 def lightkube_client() -> lightkube.Client:
@@ -104,6 +108,26 @@ async def deploy_profiles_controller(ops_test: OpsTest):
         KUBEFLOW_PROFILES_CHARM, channel=KUBEFLOW_PROFILES_CHANNEL, trust=KUBEFLOW_PROFILES_TRUST
     )
 
+    # profile-controller errors out without the AuthorizationPolicy CRD
+
+
+@pytest.fixture(scope="module")
+async def deploy_istio_pilot(ops_test: OpsTest):
+    """Deploy the istio-pilot charm."""
+    if not ops_test.model:
+        pytest.fail("ops_test has a None model", pytrace=False)
+
+    if ISTIO_CHARM in ops_test.model.applications:
+        logger.info("Istio pilot charm already exists, no need to re-deploy.")
+        return
+
+    logger.info("Deploying istio-pilot charm.")
+    await ops_test.model.deploy(ISTIO_CHARM, channel=ISTIO_CHANNEL, trust=ISTIO_TRUST)
+
+    logger.info("Waiting for the istio-pilot charm to become active.")
+    await ops_test.model.wait_for_idle(status="active", timeout=60 * 20)
+    logger.info("istio-pilot charm is active.")
+
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
@@ -118,6 +142,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     model = get_model(ops_test)
 
+    await deploy_istio_pilot(ops_test)
     await deploy_profiles_controller(ops_test)
     logger.info("Deploying the Github Profiles Automator charm.")
     await model.deploy(charm, application_name=APP_NAME, trust=CHARM_TRUST, resources=resources)
