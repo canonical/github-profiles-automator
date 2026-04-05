@@ -25,7 +25,7 @@ GITHUB_PMR_SINGLE_PATH = "tests/samples/pmr-sample-single.yaml"
 GITHUB_GIT_REVISION = "main"
 
 KUBEFLOW_PROFILES_CHARM = "kubeflow-profiles"
-KUBEFLOW_PROFILES_CHANNEL = "1.10/stable"
+KUBEFLOW_PROFILES_CHANNEL = "1.9/stable"
 KUBEFLOW_PROFILES_TRUST = True
 
 
