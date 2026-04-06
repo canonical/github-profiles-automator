@@ -108,10 +108,8 @@ async def deploy_profiles_controller(ops_test: OpsTest):
         KUBEFLOW_PROFILES_CHARM, channel=KUBEFLOW_PROFILES_CHANNEL, trust=KUBEFLOW_PROFILES_TRUST
     )
 
-    # profile-controller errors out without the AuthorizationPolicy CRD
 
-
-@pytest.fixture(scope="module")
+# profile-controller errors out without the AuthorizationPolicy CRD
 async def deploy_istio_pilot(ops_test: OpsTest):
     """Deploy the istio-pilot charm."""
     if not ops_test.model:
