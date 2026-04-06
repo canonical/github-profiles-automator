@@ -212,8 +212,8 @@ async def test_secret_changed(ops_test: OpsTest):
     await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10, idle_period=60.0)
     await app.set_config({"ssh-key-secret-id": ""})
     await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10, idle_period=60.0)
-    rc, stdout, _ = await ops_test.juju(
+    rc, _, stderr = await ops_test.juju(
         "ssh", "--container", "git-sync", unit_name, "cat", SSH_KEY_DESTINATION_PATH
     )
     assert rc == 1
-    assert "No such file or directory" in stdout
+    assert "No such file or directory" in stderr
