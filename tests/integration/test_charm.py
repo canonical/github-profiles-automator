@@ -206,3 +206,14 @@ async def test_secret_changed(ops_test: OpsTest):
     )
     assert rc == 0
     assert new_ssh_key in stdout
+
+    # Remove SSH key and assert it has been removed in the workload container
+    await model.remove_secret(secret_name)
+    await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10, idle_period=60.0)
+    await app.set_config({"ssh-key-secret-id": ""})
+    await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10, idle_period=60.0)
+    rc, stdout, _ = await ops_test.juju(
+        "ssh", "--container", "git-sync", unit_name, "cat", SSH_KEY_DESTINATION_PATH
+    )
+    assert rc == 1
+    assert "No such file or directory" in stdout

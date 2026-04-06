@@ -336,7 +336,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             # SSH key requires a newline at the end, so ensure it has one
             ssh_key += "\n\n"
             return ssh_key
-        except (ops.SecretNotFoundError, ops.model.ModelError):
+        except (ops.SecretNotFoundError, ops.model.ModelError, TypeError):
             logger.warning("An SSH URL has been set but an SSH key has not been provided.")
             return None
 
