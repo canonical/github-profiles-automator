@@ -171,7 +171,7 @@ async def test_pebble_service(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_secret_changed(ops_test: OpsTest):
-    """Pass an SSH key, then update it to see that the changes have been reflected."""
+    """Pass an SSH key, update, and then remove it to see that the changes have been reflected."""
     secret_name = "ssh-secret"
     old_ssh_key = "Old key"
     model = get_model(ops_test)
