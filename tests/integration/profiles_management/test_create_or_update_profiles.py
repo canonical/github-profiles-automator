@@ -28,8 +28,9 @@ ISTIO_PRINCIPAL = "cluster.local/ns/istio-system/sa/istio-ingressgateway-service
 
 @pytest.mark.asyncio
 async def test_remove_access_to_stale_profiles(
-    deploy_profiles_controller, lightkube_client: Client
+    deploy_istio_pilot, deploy_profiles_controller, lightkube_client: Client
 ):
+    await deploy_istio_pilot
     await deploy_profiles_controller
 
     ns = "test"

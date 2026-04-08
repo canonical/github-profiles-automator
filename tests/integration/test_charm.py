@@ -18,6 +18,8 @@ APP_NAME = METADATA["name"]
 CHARM_TRUST = True
 
 GITHUB_REPOSITORY_URL = "https://github.com/canonical/github-profiles-automator.git"
+GITHUB_REPOSITORY_URL_SSH = "git@github.com:canonical/github-profiles-automator.git"
+SSH_KEY_DESTINATION_PATH = "/etc/git-secret/ssh"
 GITHUB_PMR_FULL_PATH = "tests/samples/pmr-sample-full.yaml"
 GITHUB_PMR_SINGLE_PATH = "tests/samples/pmr-sample-single.yaml"
 GITHUB_GIT_REVISION = "main"
@@ -25,6 +27,10 @@ GITHUB_GIT_REVISION = "main"
 KUBEFLOW_PROFILES_CHARM = "kubeflow-profiles"
 KUBEFLOW_PROFILES_CHANNEL = "1.9/stable"
 KUBEFLOW_PROFILES_TRUST = True
+
+ISTIO_CHARM = "istio-pilot"
+ISTIO_CHANNEL = "1.24/stable"
+ISTIO_TRUST = True
 
 
 @pytest.fixture(scope="session")
@@ -103,6 +109,24 @@ async def deploy_profiles_controller(ops_test: OpsTest):
     )
 
 
+# profile-controller errors out without the AuthorizationPolicy CRD
+async def deploy_istio_pilot(ops_test: OpsTest):
+    """Deploy the istio-pilot charm."""
+    if not ops_test.model:
+        pytest.fail("ops_test has a None model", pytrace=False)
+
+    if ISTIO_CHARM in ops_test.model.applications:
+        logger.info("Istio pilot charm already exists, no need to re-deploy.")
+        return
+
+    logger.info("Deploying istio-pilot charm.")
+    await ops_test.model.deploy(ISTIO_CHARM, channel=ISTIO_CHANNEL, trust=ISTIO_TRUST)
+
+    logger.info("Waiting for the istio-pilot charm to become active.")
+    await ops_test.model.wait_for_idle(status="active", timeout=60 * 20)
+    logger.info("istio-pilot charm is active.")
+
+
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
     """Build the github-profiles-automator charm and deploy it.
@@ -116,6 +140,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
     model = get_model(ops_test)
 
+    await deploy_istio_pilot(ops_test)
     await deploy_profiles_controller(ops_test)
     logger.info("Deploying the Github Profiles Automator charm.")
     await model.deploy(charm, application_name=APP_NAME, trust=CHARM_TRUST, resources=resources)
@@ -142,3 +167,53 @@ async def test_pebble_service(ops_test: OpsTest):
 
     logger.info("Waiting for the Github Profiles Automator charm to become active.")
     await model.wait_for_idle(apps=[APP_NAME], status="active", timeout=60 * 10)
+
+
+@pytest.mark.abort_on_fail
+async def test_secret_changed(ops_test: OpsTest):
+    """Pass an SSH key, update, and then remove it to see that the changes have been reflected."""
+    secret_name = "ssh-secret"
+    old_ssh_key = "Old key"
+    model = get_model(ops_test)
+    app = get_application(ops_test)
+    unit_name = app.units[0].name
+
+    # Switch to connecting via SSH
+    await app.set_config({"repository": GITHUB_REPOSITORY_URL_SSH})
+
+    secret_id = await model.add_secret(name=secret_name, data_args=[f"ssh-key={old_ssh_key}"])
+    await model.grant_secret(secret_name, app.name)
+    await app.set_config({"ssh-key-secret-id": secret_id})
+
+    await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10)
+
+    rc, stdout, _ = await ops_test.juju(
+        "ssh", "--container", "git-sync", unit_name, "cat", SSH_KEY_DESTINATION_PATH
+    )
+    assert rc == 0
+    assert old_ssh_key in stdout
+
+    # Update SSH key and expect changes in the workload container
+    new_ssh_key = "New key"
+    await model.update_secret(
+        name=secret_name, new_name=secret_name, data_args=[f"ssh-key={new_ssh_key}"]
+    )
+    await app.set_config({"ssh-key-secret-id": secret_id})
+    await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10)
+
+    rc, stdout, _ = await ops_test.juju(
+        "ssh", "--container", "git-sync", unit_name, "cat", SSH_KEY_DESTINATION_PATH
+    )
+    assert rc == 0
+    assert new_ssh_key in stdout
+
+    # Remove SSH key and assert it has been removed in the workload container
+    await model.remove_secret(secret_name)
+    await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10, idle_period=60.0)
+    await app.set_config({"ssh-key-secret-id": ""})
+    await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10, idle_period=60.0)
+    rc, _, stderr = await ops_test.juju(
+        "ssh", "--container", "git-sync", unit_name, "cat", SSH_KEY_DESTINATION_PATH
+    )
+    assert rc == 1
+    assert "No such file or directory" in stderr

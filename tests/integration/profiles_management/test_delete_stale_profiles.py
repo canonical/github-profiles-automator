@@ -15,7 +15,10 @@ TESTS_YAMLS_PATH = "tests/integration/profiles_management/yamls"
 
 
 @pytest.mark.asyncio
-async def test_delete_stale_profiles(deploy_profiles_controller, lightkube_client: Client):
+async def test_delete_stale_profiles(
+    deploy_istio_pilot, deploy_profiles_controller, lightkube_client: Client
+):
+    await deploy_istio_pilot
     await deploy_profiles_controller
 
     namespace = "test"

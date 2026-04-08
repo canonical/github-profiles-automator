@@ -124,6 +124,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         )
         # Update the Profiles in case `pmr-yaml-path` has been changed
         self.framework.observe(self.on.config_changed, self._on_event_sync_profiles)
+        self.framework.observe(self.on.secret_changed, self._on_event_sync_profiles)
         # Update the Profiles in case they didn't update in the first sync
         self.framework.observe(self.on.update_status, self._on_event_sync_profiles)
 
@@ -335,7 +336,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
             # SSH key requires a newline at the end, so ensure it has one
             ssh_key += "\n\n"
             return ssh_key
-        except (ops.SecretNotFoundError, ops.model.ModelError):
+        except (ops.SecretNotFoundError, ops.model.ModelError, TypeError):
             logger.warning("An SSH URL has been set but an SSH key has not been provided.")
             return None
 
@@ -380,19 +381,26 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         if is_ssh_url(str(self.config["repository"])):
             self.repository_type = RepositoryType.SSH
             if not self.ssh_key:
+                # Remove previous instances of the key if they exist
+                if self.container.can_connect():
+                    try:
+                        self.container.remove_path(SSH_KEY_DESTINATION_PATH)
+                    except ops.pebble.PathError:
+                        pass  # already gone
                 raise ErrorWithStatus(
                     "To connect via an SSH URL you need to provide an SSH key.",
                     ops.BlockedStatus,
                 )
-            # If there is an SSH key, we push it to the workload container
-            self.files_to_push.append(
-                LazyContainerFileTemplate(
-                    source_template=self.ssh_key,
-                    destination_path=SSH_KEY_DESTINATION_PATH,
-                    permissions=SSH_KEY_PERMISSIONS,
+            else:
+                # If there is an SSH key, we push it to the workload container
+                self.files_to_push.append(
+                    LazyContainerFileTemplate(
+                        source_template=self.ssh_key,
+                        destination_path=SSH_KEY_DESTINATION_PATH,
+                        permissions=SSH_KEY_PERMISSIONS,
+                    )
                 )
-            )
-            return
+                return
 
         self.repository_type = RepositoryType.HTTPS
         if not is_https_url(str(self.config["repository"])):
@@ -456,6 +464,14 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                     )
                 )
             return
+        else:
+            if self.container.can_connect():
+                # Remove previous instances of the keys if they exist
+                try:
+                    for key in ["ssl-ca", "ssl-certificate", "ssl-key"]:
+                        self.container.remove_path(SSL_DATA_DIR / key)
+                except ops.pebble.PathError:
+                    pass  # already gone
 
 
 def is_https_url(url: str) -> bool:
