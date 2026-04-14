@@ -15,6 +15,9 @@ description: |
 containers:
   git-sync:
     resource: git-sync-image
+    # Non-root user, this corresponds to _daemon_ to align with our other charms.
+    uid: 584792
+    gid: 584792
     mounts:
       - storage: content-from-git
         location: /git
@@ -28,3 +31,5 @@ resources:
 storage:
   content-from-git:
     type: filesystem
+
+charm-user: non-root
