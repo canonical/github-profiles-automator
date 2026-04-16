@@ -116,7 +116,7 @@ def test_wrapper_script_path(
 
     # Assert
     root = harness.get_filesystem_root("git-sync")
-    assert (root / "git-sync-exechook.sh").exists()
+    assert (root / "git/git-sync-exechook.sh").exists()
 
 
 def test_ssh_key_path(
