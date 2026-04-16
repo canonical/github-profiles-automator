@@ -145,7 +145,7 @@ class GitSyncPebbleService(PebbleServiceComponent):
             "--root=/git",
             "--ssh-known-hosts=false",
             "--verbose=9",
-            "--exechook-command=/git-sync-exechook.sh",
+            "--exechook-command=/git/git-sync-exechook.sh",
         ]
 
         git_config_string = self.generate_git_config_string()
