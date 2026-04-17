@@ -187,6 +187,7 @@ async def test_secret_changed(ops_test: OpsTest):
     # Switch to connecting via SSH
     await app.set_config({"repository": GITHUB_REPOSITORY_URL_SSH})
 
+    logger.info("Creating an SSH secret.")
     secret_id = await model.add_secret(name=secret_name, data_args=[f"ssh-key={old_ssh_key}"])
     await model.grant_secret(secret_name, app.name)
     await app.set_config({"ssh-key-secret-id": secret_id})
@@ -200,6 +201,7 @@ async def test_secret_changed(ops_test: OpsTest):
     assert old_ssh_key in stdout
 
     # Update SSH key and expect changes in the workload container
+    logger.info("Updating the secret to detect changes in the workload container.")
     new_ssh_key = "New key"
     await model.update_secret(
         name=secret_name, new_name=secret_name, data_args=[f"ssh-key={new_ssh_key}"]
@@ -214,6 +216,7 @@ async def test_secret_changed(ops_test: OpsTest):
     assert new_ssh_key in stdout
 
     # Remove SSH key and assert it has been removed in the workload container
+    logger.info("Removing the secret.")
     await model.remove_secret(secret_name)
     await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10, idle_period=60.0)
     await app.set_config({"ssh-key-secret-id": ""})
