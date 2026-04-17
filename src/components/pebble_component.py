@@ -83,7 +83,7 @@ class GitSyncPebbleService(PebbleServiceComponent):
             return " ".join(
                 [
                     "ssh",
-                    "-i /etc/git-secret/ssh",
+                    "-i /git/git-secret/ssh",
                     "-o StrictHostKeyChecking=no",
                     f"{host_part};",
                     "[ $? -ne 255 ]",
