@@ -25,7 +25,7 @@ CONTAINERS_SECURITY_CONTEXT_MAP = generate_container_securitycontext_map(METADAT
 
 GITHUB_REPOSITORY_URL = "https://github.com/canonical/github-profiles-automator.git"
 GITHUB_REPOSITORY_URL_SSH = "git@github.com:canonical/github-profiles-automator.git"
-SSH_KEY_DESTINATION_PATH = "/etc/git-secret/ssh"
+SSH_KEY_DESTINATION_PATH = "/git/git-secret/ssh"
 GITHUB_PMR_FULL_PATH = "tests/samples/pmr-sample-full.yaml"
 GITHUB_PMR_SINGLE_PATH = "tests/samples/pmr-sample-single.yaml"
 GITHUB_GIT_REVISION = "main"
