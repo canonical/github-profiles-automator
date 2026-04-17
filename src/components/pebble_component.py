@@ -143,6 +143,7 @@ class GitSyncPebbleService(PebbleServiceComponent):
             f"--period={inputs.SYNC_PERIOD}s",
             "--link=cloned-repo",
             "--root=/git",
+            "--ssh-key-file=/git/git-secret/ssh",
             "--ssh-known-hosts=false",
             "--verbose=9",
             "--exechook-command=/git/git-sync-exechook.sh",
