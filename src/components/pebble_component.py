@@ -83,7 +83,7 @@ class GitSyncPebbleService(PebbleServiceComponent):
             return " ".join(
                 [
                     "ssh",
-                    "-i /etc/git-secret/ssh",
+                    "-i /git/git-secret/ssh",
                     "-o StrictHostKeyChecking=no",
                     f"{host_part};",
                     "[ $? -ne 255 ]",
@@ -143,9 +143,10 @@ class GitSyncPebbleService(PebbleServiceComponent):
             f"--period={inputs.SYNC_PERIOD}s",
             "--link=cloned-repo",
             "--root=/git",
+            "--ssh-key-file=/git/git-secret/ssh",
             "--ssh-known-hosts=false",
             "--verbose=9",
-            "--exechook-command=/git-sync-exechook.sh",
+            "--exechook-command=/git/git-sync-exechook.sh",
         ]
 
         git_config_string = self.generate_git_config_string()

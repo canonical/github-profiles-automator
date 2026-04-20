@@ -15,6 +15,10 @@ description: |
 containers:
   git-sync:
     resource: git-sync-image
+    # Non-root user, this corresponds to the `git-sync` user specified in the upstream Dockerfile:
+    # https://github.com/kubernetes/git-sync/blob/master/Dockerfile.in
+    uid: 65533
+    gid: 65533
     mounts:
       - storage: content-from-git
         location: /git
@@ -28,3 +32,5 @@ resources:
 storage:
   content-from-git:
     type: filesystem
+
+charm-user: non-root

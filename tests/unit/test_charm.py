@@ -116,7 +116,7 @@ def test_wrapper_script_path(
 
     # Assert
     root = harness.get_filesystem_root("git-sync")
-    assert (root / "git-sync-exechook.sh").exists()
+    assert (root / "git/git-sync-exechook.sh").exists()
 
 
 def test_ssh_key_path(
@@ -139,7 +139,7 @@ def test_ssh_key_path(
 
     # Assert
     root = harness.get_filesystem_root("git-sync")
-    assert (root / "etc/git-secret/ssh").exists()
+    assert (root / "git/git-secret/ssh").exists()
 
 
 @pytest.mark.parametrize(
@@ -172,7 +172,7 @@ def test_ssl_data_path(
     # Assert
     root = harness.get_filesystem_root("git-sync")
     for item in ssl_items:
-        ssl_item_path = root / f"etc/git-secret/ssl/{item}"
+        ssl_item_path = root / f"git/git-secret/ssl/{item}"
         assert ssl_item_path.exists()
         assert ssl_item_path.read_text() == base64.b64decode(secret_content[item]).decode("utf-8")
 

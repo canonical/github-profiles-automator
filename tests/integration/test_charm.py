@@ -3,11 +3,16 @@
 import logging
 from pathlib import Path
 
-import lightkube
 import pytest
 import yaml
+from charmed_kubeflow_chisme.testing import (
+    assert_security_context,
+    generate_container_securitycontext_map,
+    get_pod_names,
+)
 from juju.application import Application
 from juju.model import Model
+from lightkube import Client
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
@@ -16,10 +21,11 @@ CHARM_NAME = "github-profiles-automator"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
 CHARM_TRUST = True
+CONTAINERS_SECURITY_CONTEXT_MAP = generate_container_securitycontext_map(METADATA)
 
 GITHUB_REPOSITORY_URL = "https://github.com/canonical/github-profiles-automator.git"
 GITHUB_REPOSITORY_URL_SSH = "git@github.com:canonical/github-profiles-automator.git"
-SSH_KEY_DESTINATION_PATH = "/etc/git-secret/ssh"
+SSH_KEY_DESTINATION_PATH = "/git/git-secret/ssh"
 GITHUB_PMR_FULL_PATH = "tests/samples/pmr-sample-full.yaml"
 GITHUB_PMR_SINGLE_PATH = "tests/samples/pmr-sample-single.yaml"
 GITHUB_GIT_REVISION = "main"
@@ -34,9 +40,9 @@ ISTIO_TRUST = True
 
 
 @pytest.fixture(scope="session")
-def lightkube_client() -> lightkube.Client:
+def lightkube_client() -> Client:
     """Return a lightkube client to use in this session."""
-    client = lightkube.Client(field_manager=CHARM_NAME)
+    client = Client(field_manager=CHARM_NAME)
     return client
 
 
@@ -181,6 +187,7 @@ async def test_secret_changed(ops_test: OpsTest):
     # Switch to connecting via SSH
     await app.set_config({"repository": GITHUB_REPOSITORY_URL_SSH})
 
+    logger.info("Creating an SSH secret.")
     secret_id = await model.add_secret(name=secret_name, data_args=[f"ssh-key={old_ssh_key}"])
     await model.grant_secret(secret_name, app.name)
     await app.set_config({"ssh-key-secret-id": secret_id})
@@ -194,6 +201,7 @@ async def test_secret_changed(ops_test: OpsTest):
     assert old_ssh_key in stdout
 
     # Update SSH key and expect changes in the workload container
+    logger.info("Updating the secret to detect changes in the workload container.")
     new_ssh_key = "New key"
     await model.update_secret(
         name=secret_name, new_name=secret_name, data_args=[f"ssh-key={new_ssh_key}"]
@@ -208,6 +216,7 @@ async def test_secret_changed(ops_test: OpsTest):
     assert new_ssh_key in stdout
 
     # Remove SSH key and assert it has been removed in the workload container
+    logger.info("Removing the secret.")
     await model.remove_secret(secret_name)
     await model.wait_for_idle(apps=[APP_NAME], status="blocked", timeout=60 * 10, idle_period=60.0)
     await app.set_config({"ssh-key-secret-id": ""})
@@ -217,3 +226,24 @@ async def test_secret_changed(ops_test: OpsTest):
     )
     assert rc == 1
     assert "No such file or directory" in stderr
+
+
+@pytest.mark.parametrize("container_name", list(CONTAINERS_SECURITY_CONTEXT_MAP.keys()))
+async def test_container_security_context(
+    ops_test: OpsTest,
+    lightkube_client: Client,
+    container_name: str,
+):
+    """Test container security context is correctly set.
+
+    Verify that container spec defines the security context with correct
+    user ID and group ID.
+    """
+    pod_name = get_pod_names(ops_test.model.name, APP_NAME)[0]
+    assert_security_context(
+        lightkube_client,
+        pod_name,
+        container_name,
+        CONTAINERS_SECURITY_CONTEXT_MAP,
+        ops_test.model.name,
+    )

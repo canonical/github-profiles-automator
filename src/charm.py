@@ -30,11 +30,11 @@ from profiles_management.list_stale import list_stale_profiles
 from profiles_management.pmr.classes import Profile, ProfilesManagementRepresentation
 
 CLONED_REPO_PATH = "/git/cloned-repo/"
-SSH_KEY_DESTINATION_PATH = "/etc/git-secret/ssh"
-SSL_DATA_DIR = Path("/etc/git-secret/ssl/")
+SSH_KEY_DESTINATION_PATH = "/git/git-secret/ssh"
+SSL_DATA_DIR = Path("/git/git-secret/ssl/")
 SSH_KEY_PERMISSIONS = 0o400
 SSL_DATA_PERMISSIONS = 0o400
-EXECHOOK_SCRIPT_DESTINATION_PATH = "/git-sync-exechook.sh"
+EXECHOOK_SCRIPT_DESTINATION_PATH = "/git/git-sync-exechook.sh"
 EXECHOOK_SCRIPT_PERMISSIONS = 0o555
 
 KFP_PRINCIPAL_KEY = "kfp-ui-principal"
