@@ -29,7 +29,7 @@ jobs:
       charm-paths: ${{ steps.get-charm-paths.outputs.charm-paths }}
       track: ${{ steps.determine-track.outputs.track }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Get paths for all charms in this repo
