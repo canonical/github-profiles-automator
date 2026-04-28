@@ -125,6 +125,26 @@ jobs:
     secrets:
       charmhub-token: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
 
+  integration-library:
+    name: Integration tests for library
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: pipx install tox
+
+      - name: Setup environment
+        run: |
+          sudo apt-get remove -y docker-ce docker-ce-cli containerd.io
+          sudo rm -rf /run/containerd
+          sudo snap install concierge --classic
+          sudo concierge prepare --trace
+
+      - name: Integration tests
+        run: |
+          tox -vve integration-library -- --model testing
+
   integration:
     name: Integration tests (Canonical K8s)
     needs:
@@ -160,7 +180,7 @@ jobs:
           # Pass the path where the charm artefact is downloaded to the tox command
           # FIXME: Right now the complete path is half hardcoded to <charm name>_ubuntu@24.04-amd64.charm
           # We need to find a better way to dynamically get this value
-          tox -vve integration -- --model testing --charm-path=${{ github.workspace }}/${{ matrix.charm }}_ubuntu@24.04-amd64.charm
+          tox -vve integration-charm -- --model testing --charm-path=${{ github.workspace }}/${{ matrix.charm }}_ubuntu@24.04-amd64.charm
 
       # On failure, capture debugging resources
       - name: Get all
