@@ -130,6 +130,11 @@ jobs:
     needs:
       - build
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        charm:
+          - github-profiles-automator
     steps:
       - uses: actions/checkout@v6
 
@@ -157,3 +162,28 @@ jobs:
           # FIXME: Right now the complete path is half hardcoded to <charm name>_ubuntu@24.04-amd64.charm
           # We need to find a better way to dynamically get this value
           tox -vve integration -- --model testing --charm-path=${{ github.workspace }}/${{ matrix.charm }}_ubuntu@24.04-amd64.charm
+
+        # On failure, capture debugging resources
+        - name: Get all
+          run: kubectl get all -A
+          if: failure()
+
+        - name: Describe deployments
+          run: kubectl describe deployments -A
+          if: failure()
+
+        - name: Describe replicasets
+          run: kubectl describe replicasets -A
+          if: failure()
+
+        - name: Get juju status
+          run: juju status
+          if: failure()
+
+        - name: Get workload logs
+          run: kubectl logs --tail 100 -n testing -lapp.kubernetes.io/name=github-profiles-automator
+          if: failure()
+
+        - name: Get operator logs
+          run: kubectl logs --tail 100 -n testing -loperator.juju.is/name=github-profiles-automator
+          if: failure()
