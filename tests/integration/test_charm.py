@@ -155,7 +155,9 @@ async def test_build_and_deploy(ops_test: OpsTest, request):
     await deploy_istio_pilot(ops_test)
     await deploy_profiles_controller(ops_test)
     logger.info("Deploying the Github Profiles Automator charm.")
-    await model.deploy(entity_url, application_name=APP_NAME, trust=CHARM_TRUST, resources=resources)
+    await model.deploy(
+        entity_url, application_name=APP_NAME, trust=CHARM_TRUST, resources=resources
+    )
 
     # Wait until they are idle and have the expected status
     logger.info("Waiting for all charms to become idle.")
