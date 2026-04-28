@@ -126,7 +126,7 @@ jobs:
       charmhub-token: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
 
   integration-library:
-    name: Integration tests for library
+    name: Integration tests - library
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -146,7 +146,7 @@ jobs:
           tox -vve integration-library -- --model testing
 
   integration:
-    name: Integration tests (Canonical K8s)
+    name: Integration tests - charm
     needs:
       - build
     runs-on: ubuntu-24.04
