@@ -134,13 +134,19 @@ async def deploy_istio_pilot(ops_test: OpsTest):
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
+async def test_build_and_deploy(ops_test: OpsTest, request):
     """Build the github-profiles-automator charm and deploy it.
 
     Assert on the unit status before any relations/configurations take place.
     """
+    # Build and deploy charm from local source folder or use
+    # a charm artefact passed using --charm-path
+    entity_url = (
+        await ops_test.build_charm(".")
+        if not (entity_url := request.config.getoption("--charm-path"))
+        else entity_url
+    )
     # Build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
     image_source = METADATA["resources"]["git-sync-image"]["upstream-source"]
     resources = {"git-sync-image": image_source}
 
@@ -149,7 +155,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     await deploy_istio_pilot(ops_test)
     await deploy_profiles_controller(ops_test)
     logger.info("Deploying the Github Profiles Automator charm.")
-    await model.deploy(charm, application_name=APP_NAME, trust=CHARM_TRUST, resources=resources)
+    await model.deploy(entity_url, application_name=APP_NAME, trust=CHARM_TRUST, resources=resources)
 
     # Wait until they are idle and have the expected status
     logger.info("Waiting for all charms to become idle.")
