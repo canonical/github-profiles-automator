@@ -10,7 +10,7 @@ from lightkube.generic_resource import (
     create_global_resource,
 )
 
-from tests.integration.profiles_management.helpers import k8s
+from tests.integration.profiles_management.utils import k8s
 
 log = logging.getLogger(__name__)
 

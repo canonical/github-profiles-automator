@@ -6,7 +6,7 @@ from lightkube import Client
 from profiles_management.delete_stale import delete_stale_profiles
 from profiles_management.helpers.profiles import list_profiles
 from profiles_management.pmr import classes
-from tests.integration.profiles_management.helpers import profiles
+from tests.integration.profiles_management.utils import profiles
 
 log = logging.getLogger(__name__)
 client = Client(field_manager="profiles-automator-lightkube")

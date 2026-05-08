@@ -8,7 +8,7 @@ from profiles_management.helpers.k8s import get_name
 from profiles_management.helpers.profiles import list_profiles
 from profiles_management.list_stale import list_stale_profiles
 from profiles_management.pmr import classes
-from tests.integration.profiles_management.helpers import profiles
+from tests.integration.profiles_management.utils import profiles
 
 log = logging.getLogger(__name__)
 client = Client(field_manager="profiles-automator-lightkube")

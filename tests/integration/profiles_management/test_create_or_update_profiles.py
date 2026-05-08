@@ -15,7 +15,7 @@ from profiles_management.pmr.classes import (
     ResourceQuotaSpecModel,
     UserKind,
 )
-from tests.integration.profiles_management.helpers import kfam, profiles
+from tests.integration.profiles_management.utils import kfam, profiles
 
 log = logging.getLogger(__name__)
 
