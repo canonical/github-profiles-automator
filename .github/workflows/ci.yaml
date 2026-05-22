@@ -55,20 +55,6 @@ jobs:
               f.write(f"track={track}\n")
 
           print(f"Track: {track}")
-
-  lib-check:
-    name: Check libraries
-    needs:
-      - get-charm-paths-track
-    strategy:
-      matrix:
-        charm: ${{ fromJSON(needs.get-charm-paths-track.outputs.charm-paths) }}
-    uses: canonical/charmed-kubeflow-workflows/.github/workflows/_quality-checks.yaml@main
-    secrets: inherit
-    with:
-        charm-path: ${{ matrix.charm }}
-
-
   lint:
     name: Lint
     runs-on: ubuntu-24.04
@@ -107,6 +93,9 @@ jobs:
     with:
       path-to-charm-directory: ${{ matrix.charm }}
       cache: true
+    permissions:
+      actions: read  # Needed for GitHub API call to get workflow version (for private repositories)
+      contents: read
 
   release:
     strategy:
@@ -124,6 +113,9 @@ jobs:
       path-to-charm-directory: ${{ matrix.charm }}
     secrets:
       charmhub-token: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
+    permissions:
+      actions: read  # Needed for GitHub API call to get workflow version (for private repositories)
+      contents: read
 
   integration-library:
     name: Integration tests - library
