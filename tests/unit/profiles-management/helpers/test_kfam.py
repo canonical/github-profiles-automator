@@ -291,3 +291,34 @@ def test_generate_contributor_authorization_policy_target_refs(ambient_enabled, 
         assert ap["spec"]["targetRefs"] == expected_target_refs
     else:
         assert "targetRefs" not in ap.get("spec", {})
+
+
+@pytest.mark.parametrize(
+    "additional_principals,expected_principals",
+    [
+        (None, ["kfp-principal", "istio-principal"]),
+        ([], ["kfp-principal", "istio-principal"]),
+        (
+            ["cluster.local/ns/extra/sa/extra-sa"],
+            ["kfp-principal", "istio-principal", "cluster.local/ns/extra/sa/extra-sa"],
+        ),
+        (
+            ["principal-a", "principal-b"],
+            ["kfp-principal", "istio-principal", "principal-a", "principal-b"],
+        ),
+    ],
+)
+def test_generate_contributor_authorization_policy_additional_principals(
+    additional_principals, expected_principals
+):
+    """Test that additional_principals are appended to the principals list."""
+    contributor = Contributor(name="user@example.com", role=ContributorRole.EDIT)
+    ap = generate_contributor_authorization_policy(
+        contributor=contributor,
+        namespace="test-ns",
+        kfp_ui_principal="kfp-principal",
+        istio_ingressgateway_principal="istio-principal",
+        additional_principals=additional_principals,
+    )
+    principals = ap["spec"]["rules"][0]["from"][0]["source"]["principals"]
+    assert principals == expected_principals

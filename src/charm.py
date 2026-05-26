@@ -40,6 +40,7 @@ EXECHOOK_SCRIPT_PERMISSIONS = 0o555
 
 KFP_PRINCIPAL_KEY = "kfp-ui-principal"
 ISTIO_PRINCIPAL_KEY = "istio-ingressgateway-principal"
+ADDITIONAL_PRINCIPALS_KEY = "additional-principals"
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +224,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                     str(self.config.get(KFP_PRINCIPAL_KEY)),
                     str(self.config.get(ISTIO_PRINCIPAL_KEY)),
                     ambient_enabled=self._has_service_mesh_relation,
+                    additional_principals=self._additional_principals,
                 )
             except ApiError as e:
                 msg = (
@@ -249,6 +251,14 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
     def _has_service_mesh_relation(self) -> bool:
         """Return True if the charm has an active service-mesh relation."""
         return bool(self.model.get_relation("service-mesh"))
+
+    @property
+    def _additional_principals(self) -> list[str]:
+        """Return list of additional principals from config."""
+        raw = str(self.config.get(ADDITIONAL_PRINCIPALS_KEY, ""))
+        if not raw.strip():
+            return []
+        return [p.strip() for p in raw.split(",") if p.strip()]
 
     def _log_container_state(self):
         """Capture and log pebble logs of the workload container."""
