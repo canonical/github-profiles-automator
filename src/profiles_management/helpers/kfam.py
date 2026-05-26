@@ -237,6 +237,7 @@ def generate_contributor_authorization_policy(
     namespace: str,
     kfp_ui_principal: str,
     istio_ingressgateway_principal: str,
+    ambient_enabled: bool = False,
 ) -> GenericNamespacedResource:
     """Generate AuthorizatioinPolicy for a PMR Contributor.
 
@@ -247,11 +248,45 @@ def generate_contributor_authorization_policy(
                           AuthorizationPolicy.
         istio_ingressgateway_principal: The Istio principal of the Istio IngressGateway Pod
                                         to put in the AuthorizationPolicy.
+        ambient_enabled: If True, add a targetRef pointing to the waypoint Gateway.
+                         This should be set when the charm has a service-mesh relation.
 
     Returns:
         The generated AuthorizationPolicy lightkube object for the contributor.
     """
     name_rfc1123 = k8s.to_rfc1123_compliant(f"{contributor.name}-{contributor.role}")
+
+    spec = {
+        "rules": [
+            {
+                "from": [
+                    {
+                        "source": {
+                            "principals": [
+                                kfp_ui_principal,
+                                istio_ingressgateway_principal,
+                            ]
+                        }
+                    }
+                ],
+                "when": [
+                    {
+                        "key": "request.headers[kubeflow-userid]",
+                        "values": [contributor.name],
+                    }
+                ],
+            }
+        ],
+    }
+
+    if ambient_enabled:
+        spec["targetRefs"] = [
+            {
+                "group": "gateway.networking.k8s.io",
+                "kind": "Gateway",
+                "name": "waypoint",
+            }
+        ]
 
     return AuthorizationPolicy.from_dict(
         {
@@ -263,28 +298,7 @@ def generate_contributor_authorization_policy(
                     "role": contributor.role,
                 },
             },
-            "spec": {
-                "rules": [
-                    {
-                        "from": [
-                            {
-                                "source": {
-                                    "principals": [
-                                        kfp_ui_principal,
-                                        istio_ingressgateway_principal,
-                                    ]
-                                }
-                            }
-                        ],
-                        "when": [
-                            {
-                                "key": "request.headers[kubeflow-userid]",
-                                "values": [contributor.name],
-                            }
-                        ],
-                    }
-                ],
-            },
+            "spec": spec,
         },
     )
 
@@ -487,6 +501,7 @@ def create_authorization_policy_for_profile_contributors(
     profile: Profile,
     kfp_ui_principal: str,
     istio_ingressgateway_principal: str,
+    ambient_enabled: bool = False,
 ) -> None:
     """Create AuthorizationPolicies for all contributors defined in a Profile, in the PMR.
 
@@ -501,6 +516,7 @@ def create_authorization_policy_for_profile_contributors(
         istio_ingressgateway_principal: The Istio principal of IngressGateway, based on the
                                         ServiceAccount, to use when creating AuthorizationPolicies
                                         for Contributors.
+        ambient_enabled: If True, add a targetRef pointing to the waypoint Gateway.
 
     Raises:
         ApiError: From lightkube if there was an error while trying to create the
@@ -517,6 +533,10 @@ def create_authorization_policy_for_profile_contributors(
             log.info("Will create AuthorizationPolicy for Contributor: %s", contributor)
             client.apply(
                 generate_contributor_authorization_policy(
-                    contributor, profile.name, kfp_ui_principal, istio_ingressgateway_principal
+                    contributor,
+                    profile.name,
+                    kfp_ui_principal,
+                    istio_ingressgateway_principal,
+                    ambient_enabled=ambient_enabled,
                 )
             )

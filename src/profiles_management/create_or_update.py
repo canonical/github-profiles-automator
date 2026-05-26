@@ -56,6 +56,7 @@ def create_or_update_profiles(
     pmr: ProfilesManagementRepresentation,
     kfp_ui_principal: str,
     istio_ingressgateway_principal: str,
+    ambient_enabled: bool = False,
 ):
     """Update the cluster to ensure Profiles and contributors are updated accordingly.
 
@@ -79,6 +80,9 @@ def create_or_update_profiles(
         istio_ingressgateway_principal: The Istio principal of IngressGateway, based on the
                                         ServiceAccount, to use when updating AuthorizationPolicies
                                         for Contributors.
+        ambient_enabled: If True, add a targetRef pointing to the waypoint Gateway in
+                         AuthorizationPolicies. Should be set when the charm has a
+                         service-mesh relation.
 
     Raises:
         ApiError: From lightkube if an error occurred while trying to create or delete
@@ -132,5 +136,9 @@ def create_or_update_profiles(
 
         log.info("Creating AuthorizationPolicies for Profile: %s", profile_name)
         kfam.create_authorization_policy_for_profile_contributors(
-            client, profile, kfp_ui_principal, istio_ingressgateway_principal
+            client,
+            profile,
+            kfp_ui_principal,
+            istio_ingressgateway_principal,
+            ambient_enabled=ambient_enabled,
         )

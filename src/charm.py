@@ -19,6 +19,7 @@ from charmed_kubeflow_chisme.components import ContainerFileTemplate, LazyContai
 from charmed_kubeflow_chisme.components.charm_reconciler import CharmReconciler
 from charmed_kubeflow_chisme.components.leadership_gate_component import LeadershipGateComponent
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
+from charms.istio_beacon_k8s.v0.service_mesh import ServiceMeshConsumer
 from lightkube import ApiError, Client
 from pydantic import ValidationError
 
@@ -117,6 +118,8 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         )
 
         self.charm_reconciler.install_default_event_handlers()
+
+        self._mesh = ServiceMeshConsumer(self)
 
         # Sync when receiving a Pebble custom notice
         self.framework.observe(
@@ -219,6 +222,7 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                     self.pmr_from_yaml,
                     str(self.config.get(KFP_PRINCIPAL_KEY)),
                     str(self.config.get(ISTIO_PRINCIPAL_KEY)),
+                    ambient_enabled=self._has_service_mesh_relation,
                 )
             except ApiError as e:
                 msg = (
@@ -240,6 +244,11 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
                 raise
             except ErrorWithStatus:
                 raise
+
+    @property
+    def _has_service_mesh_relation(self) -> bool:
+        """Return True if the charm has an active service-mesh relation."""
+        return bool(self.model.get_relation("service-mesh"))
 
     def _log_container_state(self):
         """Capture and log pebble logs of the workload container."""

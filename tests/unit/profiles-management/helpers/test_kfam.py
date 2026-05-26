@@ -6,6 +6,7 @@ from lightkube.resources.rbac_authorization_v1 import RoleBinding
 
 from profiles_management.helpers.kfam import (
     authorization_policy_grants_access_to_profile_contributor,
+    generate_contributor_authorization_policy,
     get_authorization_policy_header_user,
     get_authorization_policy_principals,
     get_contributor_role,
@@ -260,3 +261,33 @@ def test_authz_policy_grants_profile_contributor_access(
         )
         == grants_access
     )
+
+
+@pytest.mark.parametrize(
+    "ambient_enabled,has_target_refs",
+    [
+        (False, False),
+        (True, True),
+    ],
+)
+def test_generate_contributor_authorization_policy_target_refs(ambient_enabled, has_target_refs):
+    """Test that targetRefs is present only when ambient_enabled is True."""
+    contributor = Contributor(name="user@example.com", role=ContributorRole.EDIT)
+    ap = generate_contributor_authorization_policy(
+        contributor=contributor,
+        namespace="test-ns",
+        kfp_ui_principal="kfp-principal",
+        istio_ingressgateway_principal="istio-principal",
+        ambient_enabled=ambient_enabled,
+    )
+    if has_target_refs:
+        expected_target_refs = [
+            {
+                "group": "gateway.networking.k8s.io",
+                "kind": "Gateway",
+                "name": "waypoint",
+            }
+        ]
+        assert ap["spec"]["targetRefs"] == expected_target_refs
+    else:
+        assert "targetRefs" not in ap.get("spec", {})
