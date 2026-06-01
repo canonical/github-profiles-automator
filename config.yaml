@@ -40,6 +40,13 @@ options:
       AuthorizationPolicies in the cluster. The value depends on the ServiceAccount of the Istio
       IngressGateway pod.
     type: string
+  additional-principals:
+    default: ""
+    description: |
+      A comma-separated list of additional Istio principals to include in the
+      AuthorizationPolicies. Each principal should follow the format
+      "cluster.local/ns/<namespace>/sa/<service-account>".
+    type: string
   ssl-data-secret-id:
     default: ""
     description: |
