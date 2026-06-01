@@ -167,6 +167,7 @@ def authorization_policy_grants_access_to_profile_contributor(
     profile: Profile,
     kfp_ui_principal: str,
     istio_ingressgateway_principal: str,
+    additional_principals: List[str] | None = None,
 ) -> bool:
     """Check if AuthorizationPolicy grants permission to a Profile Contributor.
 
@@ -181,6 +182,8 @@ def authorization_policy_grants_access_to_profile_contributor(
         kfp_ui_principal: The KFP UI Istio principal to use when checking the AuthorizationPolicy.
         istio_ingressgateway_principal: The Istio IngressGateway Istio principal to use when
                                         checking the AuthorizationPolicy.
+        additional_principals: Optional list of additional Istio principals that should be
+                               present in the AuthorizationPolicy.
 
     Returns:
         Boolean representing if the AuthorizationPolicy gives access to a Contributor of the
@@ -192,7 +195,11 @@ def authorization_policy_grants_access_to_profile_contributor(
     if not user or not principals:
         return False
 
-    if kfp_ui_principal not in principals or istio_ingressgateway_principal not in principals:
+    expected_principals = [kfp_ui_principal, istio_ingressgateway_principal]
+    if additional_principals:
+        expected_principals.extend(additional_principals)
+
+    if set(principals) != set(expected_principals):
         return False
 
     return user in profile._contributors_dict
@@ -452,6 +459,7 @@ def delete_authorization_policies_not_matching_profile_contributors(
     profile: Profile,
     kfp_ui_principal: str,
     istio_ingressgateway_principal: str,
+    additional_principals: List[str] | None = None,
 ) -> None:
     """Delete AuthorizationPolicies in the cluster that don't match Contributors in a PMR Profile.
 
@@ -466,6 +474,8 @@ def delete_authorization_policies_not_matching_profile_contributors(
         istio_ingressgateway_principal: The Istio principal of IngressGateway, based on the
                                         ServiceAccount, to use when checking existing
                                         AuthorizationPolicies.
+        additional_principals: Optional list of additional Istio principals that should be
+                               present in the AuthorizationPolicies.
 
     Raises:
         ApiError: From lightkube if something unexpected occurred while deleting the
@@ -481,7 +491,11 @@ def delete_authorization_policies_not_matching_profile_contributors(
             if not resource_matches_profile_contributor_name_role(
                 ap, profile
             ) or not authorization_policy_grants_access_to_profile_contributor(
-                ap, profile, kfp_ui_principal, istio_ingressgateway_principal
+                ap,
+                profile,
+                kfp_ui_principal,
+                istio_ingressgateway_principal,
+                additional_principals,
             ):
                 log.info(
                     "AuthorizationPolicy '%s' doesn't belong to Profile. Will delete it.",

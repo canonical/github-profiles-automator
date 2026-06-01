@@ -134,7 +134,11 @@ def create_or_update_profiles(
         # AuthorizationPolicies
         log.info("Deleting AuthorizationPolicies that don't match Profile: %s", profile_name)
         kfam.delete_authorization_policies_not_matching_profile_contributors(
-            client, profile, kfp_ui_principal, istio_ingressgateway_principal
+            client,
+            profile,
+            kfp_ui_principal,
+            istio_ingressgateway_principal,
+            additional_principals=additional_principals,
         )
 
         log.info("Creating AuthorizationPolicies for Profile: %s", profile_name)
