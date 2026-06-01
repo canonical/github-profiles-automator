@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 from lightkube.generic_resource import GenericNamespacedResource
 from lightkube.models.meta_v1 import ObjectMeta
@@ -6,6 +8,7 @@ from lightkube.resources.rbac_authorization_v1 import RoleBinding
 
 from profiles_management.helpers.kfam import (
     authorization_policy_grants_access_to_profile_contributor,
+    delete_authorization_policies_not_matching_profile_contributors,
     generate_contributor_authorization_policy,
     get_authorization_policy_header_user,
     get_authorization_policy_principals,
@@ -322,3 +325,75 @@ def test_generate_contributor_authorization_policy_additional_principals(
     )
     principals = ap["spec"]["rules"][0]["from"][0]["source"]["principals"]
     assert principals == expected_principals
+
+
+@pytest.mark.parametrize(
+    "ap_principals,additional_principals,should_delete",
+    [
+        # AP has old principal, new one expected -> delete
+        (["kfp", "istio", "old-principal"], ["new-principal"], True),
+        # AP matches expected additional principals -> keep
+        (["kfp", "istio", "extra-principal"], ["extra-principal"], False),
+        # AP has unexpected extra principal, none expected -> delete
+        (["kfp", "istio", "unexpected-principal"], None, True),
+        # AP has only base principals, none expected -> keep
+        (["kfp", "istio"], None, False),
+        # AP has multiple matching additional principals -> keep
+        (["kfp", "istio", "principal-a", "principal-b"], ["principal-a", "principal-b"], False),
+        # AP is missing one expected additional principal -> delete
+        (["kfp", "istio", "principal-a"], ["principal-a", "principal-b"], True),
+    ],
+)
+def test_delete_authorization_policies_not_matching_additional_principals(
+    ap_principals, additional_principals, should_delete
+):
+    """Test that APs with mismatched principals are deleted."""
+    profile = Profile(
+        name="test-ns",
+        contributors=[Contributor(name="user@example.com", role=ContributorRole.EDIT)],
+        owner=Owner(name="owner", kind=UserKind.USER),
+    )
+    ap = GenericNamespacedResource(
+        metadata=ObjectMeta(
+            name="user-example-com-edit",
+            namespace="test-ns",
+            annotations={"user": "user@example.com", "role": "edit"},
+        ),
+        spec={
+            "rules": [
+                {
+                    "from": [{"source": {"principals": ap_principals}}],
+                    "when": [
+                        {
+                            "key": "request.headers[kubeflow-userid]",
+                            "values": ["user@example.com"],
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+
+    with (
+        patch(
+            "profiles_management.helpers.kfam.list_contributor_authorization_policies",
+            return_value=[ap],
+        ),
+        patch(
+            "profiles_management.helpers.kfam.delete_many",
+        ) as mock_delete,
+    ):
+        delete_authorization_policies_not_matching_profile_contributors(
+            MagicMock(),
+            profile,
+            "kfp",
+            "istio",
+            additional_principals=additional_principals,
+        )
+
+        if should_delete:
+            mock_delete.assert_called_once()
+            deleted = mock_delete.call_args[0][1]
+            assert ap in deleted
+        else:
+            mock_delete.assert_not_called()
