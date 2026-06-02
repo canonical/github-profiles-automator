@@ -44,6 +44,7 @@ ignore-words-list = "NotIn"
 # LSPs and formatters
 [tool.pyright]
 include = ["src"]
+extraPaths = ["./tests/integration"]
 
 [tool.black]
 line-length = 99
