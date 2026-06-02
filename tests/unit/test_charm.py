@@ -300,6 +300,45 @@ def test_sync_now_action(
     mock_create_or_update_profiles.assert_called_once()
 
 
+@pytest.mark.parametrize(
+    "config_value",
+    [
+        "",
+        "cluster.local/ns/extra/sa/extra-sa",
+        "principal-a, principal-b",
+    ],
+)
+@patch("charm.create_or_update_profiles")
+@patch.object(GithubProfilesAutomatorCharm, "pmr_from_yaml", new_callable=PropertyMock)
+def test_sync_propagates_additional_principals(
+    mock_pmr_from_yaml,
+    mock_create_or_update,
+    harness: ops.testing.Harness[GithubProfilesAutomatorCharm],
+    mocked_lightkube_client,
+    config_value,
+):
+    """Test that additional-principals config is parsed and passed to create_or_update."""
+    # Arrange
+    harness.update_config(
+        {
+            "repository": "https://github.com/example-user/example-repo.git",
+        }
+    )
+    harness.begin_with_initial_hooks()
+
+    # Mock
+    harness.charm.container.can_connect = MagicMock(return_value=True)
+
+    # Act
+    harness.update_config({"additional-principals": config_value})
+
+    # Assert
+    expected_principals = [p.strip() for p in config_value.split(",") if p.strip()]
+    mock_create_or_update.assert_called_once()
+    call_kwargs = mock_create_or_update.call_args
+    assert call_kwargs.kwargs["additional_principals"] == expected_principals
+
+
 @patch("charm.list_stale_profiles")
 @patch.object(GithubProfilesAutomatorCharm, "pmr_from_yaml", new_callable=PropertyMock)
 def test_list_stale_profiles_action(

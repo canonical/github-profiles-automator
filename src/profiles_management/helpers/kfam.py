@@ -167,6 +167,7 @@ def authorization_policy_grants_access_to_profile_contributor(
     profile: Profile,
     kfp_ui_principal: str,
     istio_ingressgateway_principal: str,
+    additional_principals: List[str] | None = None,
 ) -> bool:
     """Check if AuthorizationPolicy grants permission to a Profile Contributor.
 
@@ -181,6 +182,8 @@ def authorization_policy_grants_access_to_profile_contributor(
         kfp_ui_principal: The KFP UI Istio principal to use when checking the AuthorizationPolicy.
         istio_ingressgateway_principal: The Istio IngressGateway Istio principal to use when
                                         checking the AuthorizationPolicy.
+        additional_principals: Optional list of additional Istio principals that should be
+                               present in the AuthorizationPolicy.
 
     Returns:
         Boolean representing if the AuthorizationPolicy gives access to a Contributor of the
@@ -192,7 +195,11 @@ def authorization_policy_grants_access_to_profile_contributor(
     if not user or not principals:
         return False
 
-    if kfp_ui_principal not in principals or istio_ingressgateway_principal not in principals:
+    expected_principals = [kfp_ui_principal, istio_ingressgateway_principal]
+    if additional_principals:
+        expected_principals.extend(additional_principals)
+
+    if set(principals) != set(expected_principals):
         return False
 
     return user in profile._contributors_dict
@@ -237,6 +244,8 @@ def generate_contributor_authorization_policy(
     namespace: str,
     kfp_ui_principal: str,
     istio_ingressgateway_principal: str,
+    ambient_enabled: bool = False,
+    additional_principals: List[str] | None = None,
 ) -> GenericNamespacedResource:
     """Generate AuthorizatioinPolicy for a PMR Contributor.
 
@@ -247,11 +256,42 @@ def generate_contributor_authorization_policy(
                           AuthorizationPolicy.
         istio_ingressgateway_principal: The Istio principal of the Istio IngressGateway Pod
                                         to put in the AuthorizationPolicy.
+        ambient_enabled: If True, add a targetRef pointing to the waypoint Gateway.
+                         This should be set when the charm has a service-mesh relation.
+        additional_principals: Optional list of additional Istio principals to include
+                               in the AuthorizationPolicy.
 
     Returns:
         The generated AuthorizationPolicy lightkube object for the contributor.
     """
     name_rfc1123 = k8s.to_rfc1123_compliant(f"{contributor.name}-{contributor.role}")
+
+    principals = [kfp_ui_principal, istio_ingressgateway_principal]
+    if additional_principals:
+        principals.extend(additional_principals)
+
+    spec = {
+        "rules": [
+            {
+                "from": [{"source": {"principals": principals}}],
+                "when": [
+                    {
+                        "key": "request.headers[kubeflow-userid]",
+                        "values": [contributor.name],
+                    }
+                ],
+            }
+        ],
+    }
+
+    if ambient_enabled:
+        spec["targetRefs"] = [
+            {
+                "group": "gateway.networking.k8s.io",
+                "kind": "Gateway",
+                "name": "waypoint",
+            }
+        ]
 
     return AuthorizationPolicy.from_dict(
         {
@@ -263,28 +303,7 @@ def generate_contributor_authorization_policy(
                     "role": contributor.role,
                 },
             },
-            "spec": {
-                "rules": [
-                    {
-                        "from": [
-                            {
-                                "source": {
-                                    "principals": [
-                                        kfp_ui_principal,
-                                        istio_ingressgateway_principal,
-                                    ]
-                                }
-                            }
-                        ],
-                        "when": [
-                            {
-                                "key": "request.headers[kubeflow-userid]",
-                                "values": [contributor.name],
-                            }
-                        ],
-                    }
-                ],
-            },
+            "spec": spec,
         },
     )
 
@@ -440,6 +459,7 @@ def delete_authorization_policies_not_matching_profile_contributors(
     profile: Profile,
     kfp_ui_principal: str,
     istio_ingressgateway_principal: str,
+    additional_principals: List[str] | None = None,
 ) -> None:
     """Delete AuthorizationPolicies in the cluster that don't match Contributors in a PMR Profile.
 
@@ -454,6 +474,8 @@ def delete_authorization_policies_not_matching_profile_contributors(
         istio_ingressgateway_principal: The Istio principal of IngressGateway, based on the
                                         ServiceAccount, to use when checking existing
                                         AuthorizationPolicies.
+        additional_principals: Optional list of additional Istio principals that should be
+                               present in the AuthorizationPolicies.
 
     Raises:
         ApiError: From lightkube if something unexpected occurred while deleting the
@@ -469,7 +491,11 @@ def delete_authorization_policies_not_matching_profile_contributors(
             if not resource_matches_profile_contributor_name_role(
                 ap, profile
             ) or not authorization_policy_grants_access_to_profile_contributor(
-                ap, profile, kfp_ui_principal, istio_ingressgateway_principal
+                ap,
+                profile,
+                kfp_ui_principal,
+                istio_ingressgateway_principal,
+                additional_principals,
             ):
                 log.info(
                     "AuthorizationPolicy '%s' doesn't belong to Profile. Will delete it.",
@@ -487,6 +513,8 @@ def create_authorization_policy_for_profile_contributors(
     profile: Profile,
     kfp_ui_principal: str,
     istio_ingressgateway_principal: str,
+    ambient_enabled: bool = False,
+    additional_principals: List[str] | None = None,
 ) -> None:
     """Create AuthorizationPolicies for all contributors defined in a Profile, in the PMR.
 
@@ -501,6 +529,9 @@ def create_authorization_policy_for_profile_contributors(
         istio_ingressgateway_principal: The Istio principal of IngressGateway, based on the
                                         ServiceAccount, to use when creating AuthorizationPolicies
                                         for Contributors.
+        ambient_enabled: If True, add a targetRef pointing to the waypoint Gateway.
+        additional_principals: Optional list of additional Istio principals to include
+                               in the AuthorizationPolicies.
 
     Raises:
         ApiError: From lightkube if there was an error while trying to create the
@@ -517,6 +548,11 @@ def create_authorization_policy_for_profile_contributors(
             log.info("Will create AuthorizationPolicy for Contributor: %s", contributor)
             client.apply(
                 generate_contributor_authorization_policy(
-                    contributor, profile.name, kfp_ui_principal, istio_ingressgateway_principal
+                    contributor,
+                    profile.name,
+                    kfp_ui_principal,
+                    istio_ingressgateway_principal,
+                    ambient_enabled=ambient_enabled,
+                    additional_principals=additional_principals,
                 )
             )
