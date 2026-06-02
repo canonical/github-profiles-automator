@@ -138,14 +138,18 @@ jobs:
           tox -vve integration-library -- --model testing
 
   integration:
-    name: Integration tests - charm
+    name: Integration tests - charm (${{ matrix.tox-env }})
     needs:
       - build
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        charm: [github-profiles-automator]
+        include:
+          - charm: github-profiles-automator
+            tox-env: integration-charm
+          - charm: github-profiles-automator
+            tox-env: integration-charm-ambient
     steps:
       - uses: actions/checkout@v6
 
@@ -158,6 +162,13 @@ jobs:
           sudo rm -rf /run/containerd
           sudo snap install concierge --classic
           sudo concierge prepare --trace
+
+      - name: Configure Cilium for Istio
+        run: |
+          # for context, see https://docs.cilium.io/en/stable/network/servicemesh/istio/
+          kubectl -n kube-system patch configmap cilium-config --type merge --patch '{"data":{"bpf-lb-sock-hostns-only":"true"}}'
+          kubectl -n kube-system patch configmap cilium-config --type merge --patch '{"data":{"cni-exclusive":"false"}}'
+          kubectl -n kube-system rollout restart daemonset cilium
 
       - name: Download packed charm(s)
         id: download-charms
@@ -172,7 +183,7 @@ jobs:
           # Pass the path where the charm artefact is downloaded to the tox command
           # FIXME: Right now the complete path is half hardcoded to <charm name>_ubuntu@24.04-amd64.charm
           # We need to find a better way to dynamically get this value
-          tox -vve integration-charm -- --model testing --charm-path=${{ github.workspace }}/${{ matrix.charm }}_ubuntu@24.04-amd64.charm
+          tox -vve ${{ matrix.tox-env }} -- --model testing --charm-path=${{ github.workspace }}/${{ matrix.charm }}_ubuntu@24.04-amd64.charm
 
       # On failure, capture debugging resources
       - name: Get all
