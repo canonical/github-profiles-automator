@@ -131,6 +131,13 @@ class GithubProfilesAutomatorCharm(ops.CharmBase):
         self.framework.observe(self.on.secret_changed, self._on_event_sync_profiles)
         # Update the Profiles in case they didn't update in the first sync
         self.framework.observe(self.on.update_status, self._on_event_sync_profiles)
+        # Re-sync Profiles when the service-mesh relation changes
+        self.framework.observe(
+            self.on["service-mesh"].relation_changed, self._on_event_sync_profiles
+        )
+        self.framework.observe(
+            self.on["service-mesh"].relation_broken, self._on_event_sync_profiles
+        )
 
         # Handlers for all Juju actions
         self.framework.observe(self.on.sync_now_action, self._on_sync_now)
