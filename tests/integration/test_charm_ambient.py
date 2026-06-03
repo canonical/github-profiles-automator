@@ -354,10 +354,13 @@ async def test_additional_principals_in_authorization_policies(
     # Load PMR to determine the expected profile namespace
     pmr = yaml.safe_load(Path(f"./{GITHUB_PMR_SINGLE_PATH}").read_text())
     profile_name = pmr["profiles"][0]["name"]
+    contributors = pmr["profiles"][0].get("contributors", [])
 
     # Verify AuthorizationPolicies include the additional principal
     aps = list_contributor_authorization_policies(lightkube_client, profile_name)
-    assert len(aps) > 0, "Expected at least one contributor AuthorizationPolicy"
+    assert len(aps) == len(
+        contributors
+    ), f"Expected {len(contributors)} AuthorizationPolicies, got {len(aps)}"
 
     for ap in aps:
         principals = ap["spec"]["rules"][0]["from"][0]["source"]["principals"]
