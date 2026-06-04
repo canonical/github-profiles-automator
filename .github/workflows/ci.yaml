@@ -145,11 +145,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - charm: github-profiles-automator
-            tox-env: integration-charm
-          - charm: github-profiles-automator
-            tox-env: integration-charm-ambient
+        charm: [github-profiles-automator]
+        tox-env: [integration-charm, integration-charm-ambient]
     steps:
       - uses: actions/checkout@v6
 
