@@ -3,9 +3,14 @@ output "app_name" {
 }
 
 output "provides" {
-  value = {}
+  value = {
+    provide_cmr_mesh = "provide-cmr-mesh"
+  }
 }
 
 output "requires" {
-  value = {}
+  value = {
+    require_cmr_mesh = "require-cmr-mesh"
+    service_mesh     = "service-mesh"
+  }
 }
