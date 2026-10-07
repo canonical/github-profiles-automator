@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 import base64
+import os
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import ops
@@ -117,6 +118,69 @@ def test_wrapper_script_path(
     # Assert
     root = harness.get_filesystem_root("git-sync")
     assert (root / "git/git-sync-exechook.sh").exists()
+
+
+@pytest.mark.parametrize(
+    "proxy_settings",
+    [
+        {},
+        {"HTTP_PROXY": ""},
+        {"HTTP_PROXY": "http://proxy.example.test:3128"},
+        {"HTTPS_PROXY": "http://proxy.example.test:3128"},
+        {"NO_PROXY": "localhost,127.0.0.1,.svc"},
+        {
+            "HTTP_PROXY": "http://http-proxy.example.test:3128",
+            "HTTPS_PROXY": "http://https-proxy.example.test:3128",
+            "NO_PROXY": "localhost,127.0.0.1,.svc",
+        },
+    ],
+)
+def test_git_sync_proxy_environment(harness, proxy_settings):
+    """Forward Juju proxies to both the service and repository check."""
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin()
+    juju_environment = {f"JUJU_CHARM_{name}": value for name, value in proxy_settings.items()}
+    expected_environment = {
+        variant: value
+        for name, value in proxy_settings.items()
+        if value
+        for variant in (name, name.lower())
+    }
+
+    with patch.dict(os.environ, juju_environment, clear=True):
+        layer = harness.charm.pebble_service_container.component.get_layer().to_dict()
+
+    assert layer["services"]["git-sync"].get("environment", {}) == expected_environment
+    assert (
+        layer["checks"]["check-repository"]["exec"].get("environment", {}) == expected_environment
+    )
+
+
+def test_git_sync_proxy_environment_changes(harness):
+    """Refresh proxy settings when the layer is regenerated."""
+    harness.update_config({"repository": "https://github.com/example-user/example-repo.git"})
+    harness.begin()
+    component = harness.charm.pebble_service_container.component
+
+    with patch.dict(
+        os.environ, {"JUJU_CHARM_HTTPS_PROXY": "http://old.example.test:3128"}, clear=True
+    ):
+        assert component.get_layer().services["git-sync"].environment["https_proxy"] == (
+            "http://old.example.test:3128"
+        )
+        os.environ["JUJU_CHARM_HTTPS_PROXY"] = "http://new.example.test:3128"
+        layer = component.get_layer().to_dict()
+        expected_environment = {
+            "HTTPS_PROXY": "http://new.example.test:3128",
+            "https_proxy": "http://new.example.test:3128",
+        }
+        assert layer["services"]["git-sync"]["environment"] == expected_environment
+        assert layer["checks"]["check-repository"]["exec"]["environment"] == expected_environment
+
+        del os.environ["JUJU_CHARM_HTTPS_PROXY"]
+        layer = component.get_layer().to_dict()
+        assert not layer["services"]["git-sync"].get("environment")
+        assert not layer["checks"]["check-repository"]["exec"].get("environment")
 
 
 def test_ssh_key_path(

@@ -7,6 +7,7 @@
 """
 
 import logging
+import os
 from enum import Enum
 from pathlib import Path
 
@@ -156,11 +157,16 @@ class GitSyncPebbleService(PebbleServiceComponent):
 
         check_command = self.generate_check_command()
         command = " ".join(command_parts)
+        environment = {}
+        for proxy_name in ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"):
+            if proxy_value := os.environ.get(f"JUJU_CHARM_{proxy_name}"):
+                environment[proxy_name] = proxy_value
+                environment[proxy_name.lower()] = proxy_value
 
         checks = {
             "check-repository": CheckDict(
                 override="replace",
-                exec={"command": f"bash -c '{check_command}'"},
+                exec={"command": f"bash -c '{check_command}'", "environment": environment},
             )
         }
         return Layer(
@@ -173,6 +179,7 @@ class GitSyncPebbleService(PebbleServiceComponent):
                         "summary": "git-sync",
                         "command": f"bash -c '{command}'",
                         "startup": "enabled",
+                        "environment": environment,
                     }
                 },
                 checks=checks,
